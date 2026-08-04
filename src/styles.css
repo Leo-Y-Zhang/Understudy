@@ -1,0 +1,25 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  color-scheme: dark;
+  --color-bg: #0b0d12;
+  --color-fg: #f5f6f8;
+  --color-accent: #5b8cff;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}

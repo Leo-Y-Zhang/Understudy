@@ -1,0 +1,29 @@
+{
+  "name": "understudy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "test:unit": "vitest run --dir tests/unit",
+    "test:integration": "vitest run --dir tests/integration",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
+    "@huggingface/transformers": "4.2.0"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vite": "8.2.0",
+    "vitest": "4.1.10",
+    "eslint": "10.8.0",
+    "typescript-eslint": "8.66.0",
+    "@playwright/test": "1.62.1",
+    "@axe-core/playwright": "4.12.1"
+  }
+}
