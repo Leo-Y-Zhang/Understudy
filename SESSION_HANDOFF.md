@@ -26,7 +26,7 @@ with a verified test cycle and a pushed commit.
 - [x] T13 Whisper worker + integration test
 - [x] T14 Session flow UI (consent -> processing)
 - [x] T15 Replay screen (timeline + scorecard)
-- [ ] T16 Persistence + dashboard
+- [x] T16 Persistence + dashboard
 - [ ] T17 E2E, a11y, CI-complete, Pages deploy
 
 ## Needs a human (queued, non-blocking)
