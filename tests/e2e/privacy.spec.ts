@@ -70,7 +70,7 @@ test.describe('privacy', () => {
 
     // Real mode: no ?mock=1. A fresh context has no stored consent, so
     // consent is the first screen regardless.
-    await page.goto('/');
+    await page.goto('./');
     await expect(page.locator('[data-screen="consent"]')).toBeVisible();
     expect(await page.evaluate(() => window.__gumCalls.length)).toBe(0);
 

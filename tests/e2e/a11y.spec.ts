@@ -53,13 +53,13 @@ async function assertNoSeriousViolations(page: Page, label: string, excludeSelec
 
 test.describe('accessibility', () => {
   test('consent screen has no serious or critical violations', async ({ page }) => {
-    await page.goto('/?mock=1&fast=1');
+    await page.goto('?mock=1&fast=1');
     await expect(page.locator('[data-screen="consent"]')).toBeVisible();
     await assertNoSeriousViolations(page, 'consent');
   });
 
   test('home screen has no serious or critical violations', async ({ page }) => {
-    await page.goto('/?mock=1&fast=1');
+    await page.goto('?mock=1&fast=1');
     await page.getByRole('button', { name: 'Accept and continue' }).click();
     await expect(page.locator('[data-screen="home"]')).toBeVisible();
     await assertNoSeriousViolations(page, 'home');

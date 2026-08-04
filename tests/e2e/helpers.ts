@@ -18,7 +18,7 @@ import { Page, expect } from '@playwright/test';
 export async function runMockJourneyToReplay(page: Page, opts: { waitMs?: number } = {}): Promise<void> {
   const waitMs = opts.waitMs ?? 2000;
 
-  await page.goto('/?mock=1&fast=1');
+  await page.goto('?mock=1&fast=1');
   await expect(page.locator('[data-screen="consent"]')).toBeVisible();
 
   await page.getByRole('button', { name: 'Accept and continue' }).click();

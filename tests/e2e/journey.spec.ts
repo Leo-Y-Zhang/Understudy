@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 test.describe('mock rehearsal journey', () => {
   test('consent -> home -> question -> session -> processing -> replay -> dashboard -> wipe', async ({ page }) => {
     // Consent blocks first: nothing else is reachable before Accept.
-    await page.goto('/?mock=1&fast=1');
+    await page.goto('?mock=1&fast=1');
     await expect(page.locator('[data-screen="consent"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Before you rehearse' })).toBeVisible();
     await expect(page.locator('[data-screen="home"]')).toHaveCount(0);
