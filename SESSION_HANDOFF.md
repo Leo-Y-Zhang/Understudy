@@ -18,9 +18,9 @@ with a verified test cycle and a pushed commit.
 - [x] T5 Gaze / eye-contact detector
 - [x] T6 Blink + burst detector
 - [x] T7 Expression-event detector
-- [ ] T8 Head-steadiness detector
+- [x] T8 Head-steadiness detector
 - [x] T9 VAD + pause detector
-- [ ] T10 Fluency (WPM, pace, fillers)
+- [x] T10 Fluency (WPM, pace, fillers)
 - [ ] T11 Scoring + analyzeSession
 - [ ] T12 Capture layer + live HUD
 - [ ] T13 Whisper worker + integration test
