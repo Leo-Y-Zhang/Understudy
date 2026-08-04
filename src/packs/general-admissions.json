@@ -1,0 +1,186 @@
+{
+  "id": "general-admissions",
+  "title": "General admissions",
+  "questions": [
+    {
+      "id": "why-study-subject",
+      "text": "Why do you want to study your chosen subject?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "changed-your-thinking",
+      "text": "Tell me about something you have read or watched recently that changed how you think.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "got-something-wrong",
+      "text": "Describe a time you got something badly wrong. What did you do next?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "beyond-the-syllabus",
+      "text": "What would you want to explore beyond your current syllabus, and why?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "explain-something-fascinating",
+      "text": "Explain something you find genuinely fascinating to someone who has never met the idea.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "unanswered-question",
+      "text": "What is the most interesting question in your subject that nobody has fully answered yet?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "proud-of-work",
+      "text": "Tell me about a piece of work you are proud of, and what made it good.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "changed-your-mind",
+      "text": "Describe a time you changed your mind about something important. What changed it?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "disagree-with-consensus",
+      "text": "What is a widely held opinion in your field of interest that you disagree with, and why?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "shaped-your-thinking",
+      "text": "Tell me about a book, article, or talk outside your school reading that shaped how you think about your subject.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "different-approach-collaborator",
+      "text": "Describe a time you had to work with someone whose approach was very different from yours. How did it go?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "free-afternoon-library",
+      "text": "What would you do with an unplanned free afternoon and a good library?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "explain-to-a-novice",
+      "text": "Tell me about a time you had to explain something complicated to someone with no background in it.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "got-better-at-something",
+      "text": "What is something you used to find difficult that you have since got better at? How?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "decision-in-hindsight",
+      "text": "Describe a decision you made that you would make differently now.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "question-for-an-expert",
+      "text": "What is a question you would like to ask an expert in your subject, and why that one?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "disagreed-with-a-teacher",
+      "text": "Tell me about a time you disagreed with a teacher, tutor, or supervisor. How did you handle it?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "learned-from-failure",
+      "text": "What have you learned from a failure that you could not have learned any other way?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "built-outside-classroom",
+      "text": "Describe something you built, wrote, organised, or solved outside the classroom.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "self-taught-skill",
+      "text": "What is a skill you have taught yourself, and how did you go about learning it?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "persuading-someone",
+      "text": "Tell me about a time you had to persuade someone to see things your way.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "ethical-question-in-subject",
+      "text": "What ethical question in your subject do you think about most, and where do you currently stand on it?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "kept-going-when-difficult",
+      "text": "Describe a time you had to keep going with something difficult when you wanted to give up.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "school-versus-practice",
+      "text": "What is the difference between how your subject is taught at school and how you imagine it is actually practised?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "team-achievement",
+      "text": "Tell me about a time you worked as part of a team towards something you could not have done alone.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "change-how-its-introduced",
+      "text": "What would you change about how your subject is usually introduced to beginners?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "made-time-for-outside-studies",
+      "text": "Describe something you have made time for outside your studies that matters to you, and why.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "common-beginner-mistake",
+      "text": "What is a mistake commonly made by people new to your subject, and how would you avoid it?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "hard-to-hear-feedback",
+      "text": "Tell me about a piece of feedback that was hard to hear but useful.",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    },
+    {
+      "id": "sit-in-on-research",
+      "text": "If you could sit in on one lecture, seminar, or piece of research in progress this year, what would it be, and why?",
+      "thinkingS": 30,
+      "suggestedAnswerS": 120
+    }
+  ]
+}

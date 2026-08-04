@@ -30,6 +30,8 @@ export class AudioMeter {
   private values: number[] = [];
 
   async start(stream: MediaStream): Promise<void> {
+    if (this.audioCtx) throw new Error('AudioMeter already started');
+
     const audioCtx = new AudioContext();
 
     await audioCtx.audioWorklet.addModule(rmsWorkletUrl);

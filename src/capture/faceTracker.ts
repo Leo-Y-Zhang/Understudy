@@ -44,6 +44,8 @@ export class FaceTracker {
   private presentCount = 0;
 
   async start(video: HTMLVideoElement, onSample: (s: FaceSample) => void): Promise<void> {
+    if (this.running) throw new Error('FaceTracker already started');
+
     const vision = await FilesetResolver.forVisionTasks(WASM_BASE_PATH);
     this.landmarker = await this.createLandmarker(vision);
     this.video = video;

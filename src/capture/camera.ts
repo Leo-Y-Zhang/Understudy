@@ -9,6 +9,8 @@ export class Camera {
   private stream: MediaStream | null = null;
 
   async start(): Promise<MediaStream> {
+    if (this.stream) throw new Error('Camera already started');
+
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
       audio: { echoCancellation: true, noiseSuppression: true },

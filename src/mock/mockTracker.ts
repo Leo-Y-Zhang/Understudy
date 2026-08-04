@@ -39,15 +39,22 @@ export class MockTracker {
   private timer: ReturnType<typeof setInterval> | null = null;
   private frameIndex = 0;
 
-  start(onSample: (s: FaceSample) => void): Promise<void> {
+  start(onSample: (s: FaceSample) => void, opts?: { fast?: boolean }): Promise<void> {
+    if (this.timer !== null) throw new Error('MockTracker already started');
+
     this.frameIndex = 0;
     console.log('[mockTracker] tracker-initialized');
+
+    // `fast` only compresses real time between ticks; `t` stays
+    // index-derived (frameIndex / FPS), so the virtual timeline used by the
+    // detectors is unchanged -- a fast run just races through it quicker.
+    const intervalMs = opts?.fast ? 1 : FRAME_INTERVAL_MS;
 
     this.timer = setInterval(() => {
       const t = this.frameIndex / FPS;
       onSample(sampleAt(t));
       this.frameIndex += 1;
-    }, FRAME_INTERVAL_MS);
+    }, intervalMs);
 
     return Promise.resolve();
   }

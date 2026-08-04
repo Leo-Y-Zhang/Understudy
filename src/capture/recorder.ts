@@ -16,6 +16,8 @@ export class Recorder {
   private mimeType = '';
 
   start(stream: MediaStream): void {
+    if (this.mediaRecorder) throw new Error('Recorder already started');
+
     this.mimeType = pickMimeType();
     this.chunks = [];
     this.mediaRecorder = new MediaRecorder(stream, this.mimeType ? { mimeType: this.mimeType } : undefined);
