@@ -17,7 +17,7 @@ with a verified test cycle and a pushed commit.
 - [x] T4 Face math (pose Euler + iris gaze)
 - [x] T5 Gaze / eye-contact detector
 - [ ] T6 Blink + burst detector
-- [ ] T7 Expression-event detector
+- [x] T7 Expression-event detector
 - [ ] T8 Head-steadiness detector
 - [ ] T9 VAD + pause detector
 - [ ] T10 Fluency (WPM, pace, fillers)
