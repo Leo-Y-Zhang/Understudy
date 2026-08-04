@@ -19,7 +19,7 @@ with a verified test cycle and a pushed commit.
 - [x] T6 Blink + burst detector
 - [x] T7 Expression-event detector
 - [ ] T8 Head-steadiness detector
-- [ ] T9 VAD + pause detector
+- [x] T9 VAD + pause detector
 - [ ] T10 Fluency (WPM, pace, fillers)
 - [ ] T11 Scoring + analyzeSession
 - [ ] T12 Capture layer + live HUD
