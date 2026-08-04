@@ -32,6 +32,7 @@ body {
   --color-sage: #8fb093;
   --color-curtain: #7a3232; /* Stop / error fill, both themes */
   --color-curtain-ink: #f2ecdc; /* fixed text painted on curtain fill, both themes */
+  --color-video-well-ink: #9aa08c; /* fixed text painted on the always-dark video well, both themes -- ~7.5:1 on #050603 */
   --color-curtain-text: #e38585; /* error copy on dark */
   --color-curtain-dot: #c2585a; /* REC dot, decorative */
   --color-line: #2b3226;
@@ -666,7 +667,7 @@ progress::-moz-progress-bar {
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-4);
-  color: var(--color-text-muted);
+  color: var(--color-video-well-ink);
   font-size: var(--text-sm);
   text-align: center;
 }

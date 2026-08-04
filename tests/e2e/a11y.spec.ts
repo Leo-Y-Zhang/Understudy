@@ -12,33 +12,8 @@ import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { runMockJourneyToReplay } from './helpers';
 
-/**
- * KNOWN, FILED, UNFIXED app defect (found by this suite, root-caused, not
- * patched -- src/styles.css is out of scope for task 17a): `.replay-video-wrap`
- * (src/styles.css:648) hardcodes `background: #050603` -- an always-dark
- * "video well" that stays dark in both themes, deliberately -- but its
- * placeholder text (src/styles.css:669, `.replay-video-placeholder`)
- * inherits the *theme-relative* `--color-text-muted` token. In light mode
- * (`prefers-color-scheme: light`, Chromium/Playwright's default) that token
- * resolves to `#5b5f4e` (src/styles.css:104), a colour tuned for the light
- * theme's cream background, not this permanently-dark well -- giving
- * "No video captured in this mode" a 3.08:1 contrast ratio against the
- * 4.5:1 WCAG 2 AA minimum. In dark mode the same token resolves to `#9aa08c`
- * against the same `#050603`, which passes comfortably -- the bug is
- * specific to the light-theme/dark-well combination. Fix belongs to
- * whoever owns src/styles.css next: give `.replay-video-placeholder` a
- * theme-invariant colour (e.g. reuse dark theme's `--color-text-muted`, or a
- * new dedicated token) instead of the theme-relative one. Excluded here,
- * by exact selector, so this one already-known defect doesn't block CI --
- * everything else on the replay screen is still held to the same strict
- * zero-serious-violations bar.
- */
-const REPLAY_KNOWN_ISSUES = ['.replay-video-placeholder'];
-
-async function assertNoSeriousViolations(page: Page, label: string, excludeSelectors: string[] = []): Promise<void> {
-  let builder = new AxeBuilder({ page });
-  for (const selector of excludeSelectors) builder = builder.exclude(selector);
-  const results = await builder.analyze();
+async function assertNoSeriousViolations(page: Page, label: string): Promise<void> {
+  const results = await new AxeBuilder({ page }).analyze();
 
   const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
   const minor = results.violations.filter((v) => v.impact === 'moderate' || v.impact === 'minor');
@@ -67,7 +42,7 @@ test.describe('accessibility', () => {
 
   test('replay screen (completed mock session) has no serious or critical violations', async ({ page }) => {
     await runMockJourneyToReplay(page);
-    await assertNoSeriousViolations(page, 'replay', REPLAY_KNOWN_ISSUES);
+    await assertNoSeriousViolations(page, 'replay');
   });
 
   test('dashboard screen (with a saved session) has no serious or critical violations', async ({ page }) => {

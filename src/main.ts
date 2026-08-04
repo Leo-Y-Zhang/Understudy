@@ -29,7 +29,11 @@ function parseFlags(): RunFlags {
 }
 
 function main(): void {
-  const root = document.querySelector<HTMLDivElement>('#app');
+  // #app is a <main> landmark (the single one for the whole app -- screens
+  // swap as its children, they don't each add their own landmark). <main>
+  // has no dedicated DOM interface, so this is typed as HTMLElement, not
+  // HTMLDivElement.
+  const root = document.querySelector<HTMLElement>('#app');
   if (!root) return;
 
   const flags = parseFlags();
