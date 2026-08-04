@@ -175,13 +175,26 @@ export function sessionScreen(app: App, props: SessionProps): HTMLElement {
           await video.play();
         }
 
-        const meter = new AudioMeter();
-        await meter.start(stream);
-        audioMeter = meter;
-
+        // Final-review Fix 2: FaceTracker must come up FIRST -- its WASM +
+        // model load is the slow step here (can run seconds) -- and
+        // AudioMeter must start on the line immediately before
+        // Recorder.start(), with no `await` between them, so the RMS hop
+        // clock (AudioMeter, t=0 at its first hop) and the recorded audio
+        // (Recorder, t=0 at MediaRecorder start) begin from the same
+        // instant. The previous order started AudioMeter *before*
+        // FaceTracker's slow load, so the RMS clock silently ran ahead of
+        // the recording by however long that load took -- every RMS-derived
+        // event (pauses, in particular) plotted late on the replay timeline
+        // by that same latency. Do not reorder this or insert anything
+        // between the AudioMeter and Recorder starts, however tidy that
+        // looks -- the adjacency is the fix.
         const faceTracker = new FaceTracker();
         if (video) await faceTracker.start(video, onSample);
         tracker = faceTracker;
+
+        const meter = new AudioMeter();
+        await meter.start(stream);
+        audioMeter = meter;
 
         const rec = new Recorder();
         rec.start(stream);

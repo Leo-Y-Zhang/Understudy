@@ -124,6 +124,15 @@ export async function transcribe(
       };
       const onWorkerError = (ev: ErrorEvent): void => {
         cleanup();
+        // Final-review Fix 1: a worker-level error (as opposed to an
+        // in-band { type: 'error' } message the worker's own try/catch
+        // reported) means something went wrong outside the worker's
+        // control-flow -- its state afterwards is not trustworthy. Kill it
+        // and drop the cached singleton so the *next* transcribe() call
+        // (e.g. a "Try again" retry) spawns a fresh worker instead of
+        // reusing one that may be half-initialized or wedged.
+        w.terminate();
+        if (worker === w) worker = null;
         reject(new Error(ev.message || 'whisper worker error'));
       };
 

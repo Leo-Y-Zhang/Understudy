@@ -11,9 +11,17 @@ import { Page, expect } from '@playwright/test';
  * Runs the full mock-mode rehearsal journey from a cold load through to a
  * mounted replay screen for a freshly completed, freshly saved session.
  * `waitMs` is real time spent on the session screen while the fast mock
- * clock (`&fast=1`) races through its virtual timeline generating a gaze
- * break and a blink burst -- 2s of real time comfortably covers the mock's
- * last scripted event at virtual t=31s (see src/mock/mockTracker.ts).
+ * clock (`&fast=1`) races through its virtual timeline. Browsers clamp
+ * `setInterval(fn, 1)` to >=4ms per tick, so `&fast=1` only buys ~6-8x real
+ * time in practice, not the ~33x a naive "1ms tick" reading suggests
+ * (measured in journey.spec.ts: 2.06s real -> 0:17 virtual, 5.07s real ->
+ * 0:30 virtual). The default here (2s, reaching roughly virtual t=17s) does
+ * NOT reliably reach the mock's last scripted event, the blink burst at
+ * virtual t=30.0-31.0s (see src/mock/mockTracker.ts) -- that needs the full
+ * 8s journey.spec.ts uses. This helper's only callers (privacy.spec.ts,
+ * a11y.spec.ts) just need a completed, saved mock session and don't care
+ * about the burst, so the short default is intentional; pass a longer
+ * `waitMs` if a future caller needs the burst too.
  */
 export async function runMockJourneyToReplay(page: Page, opts: { waitMs?: number } = {}): Promise<void> {
   const waitMs = opts.waitMs ?? 2000;

@@ -63,7 +63,7 @@ flowchart LR
     fs --> core
     rms --> core
     words --> core
-    core["Pure measurement core\n(typed, deterministic,\n95 unit tests)"] --> ev["Delivery events\n+ scores"]
+    core["Pure measurement core\n(typed, deterministic,\n97 unit tests)"] --> ev["Delivery events\n+ scores"]
     ev --> replay["Annotated replay\n+ scorecard + trends"]
 ```
 
@@ -92,14 +92,18 @@ comparing your own practice sessions on the same setup; they are not
 comparisons against other people or against any norm. Landmark models behave
 differently across faces, lighting, and cameras — trends are meaningful,
 absolute numbers are not. Word-level timings are estimated within the
-transcribed segment boundaries, so filler timestamps are approximate.
+transcribed segment boundaries, so filler timestamps are approximate. Filler
+counting matches a fixed word list (`um`, `uh`, `like`, `you know`, and
+similar) rather than judging intent, so it will flag every occurrence of a
+word like "like", including grammatically legitimate ones ("I like this
+question") — it cannot tell those apart from the filler.
 
 ## Development
 
 ```bash
 npm ci
 npm run dev          # local dev server
-npm run test:unit    # 95 tests over the pure measurement core
+npm run test:unit    # 97 unit tests
 npm run test:e2e     # Playwright journeys incl. the zero-network guarantee + axe a11y scan
 npm run test:integration  # real Whisper transcription of a synthetic-voice fixture (local only)
 npm run build        # production build (deployed to GitHub Pages by CI)

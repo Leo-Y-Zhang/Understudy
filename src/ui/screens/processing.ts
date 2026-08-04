@@ -95,7 +95,7 @@ export function processingScreen(app: App, props: ProcessingHandoff): HTMLElemen
             setProgress(1);
             return mockWords;
           })()
-        : await transcribe(requireAudio(result.audio16k), setProgress);
+        : await transcribe(audioForAttempt(requireAudio(result.audio16k)), setProgress);
 
       progressWrap.hidden = true;
       stepLabel.textContent = 'Analysing delivery…';
@@ -143,7 +143,31 @@ function requireAudio(audio16k: Float32Array | null): Float32Array {
   return audio16k;
 }
 
+// Final-review Fix 1: whisperClient.transcribe() transfers (does not copy)
+// the Float32Array it's given into the worker as a zero-copy handoff --
+// detaching it in this context the instant transcribe() is called (see
+// whisperClient.ts's docstring). run() re-runs this same code path on every
+// "Try again" click, so if it kept passing the SAME result.audio16k across
+// attempts, the second attempt's postMessage would throw a deterministic
+// DataCloneError against an already-detached buffer -- the retry could
+// never succeed, no matter what actually caused the first failure. Slicing
+// a fresh copy from the untouched source on every attempt (including the
+// first, so there's exactly one code path) means one attempt's detached
+// buffer can never poison the next. `result.audio16k` itself is never
+// transferred, so it stays valid for as many retries as the user wants.
+// Exported so a unit test can exercise this exact contract without pulling
+// in whisperClient.ts's browser-only (`document`-touching) module.
+export function audioForAttempt(audio16k: Float32Array): Float32Array {
+  return audio16k.slice();
+}
+
 function describeProcessingError(err: unknown): string {
   void err;
-  return 'We couldn’t finish reviewing that take. Nothing was lost — try again, or rehearse once more if this keeps happening.';
+  // Not "nothing was lost": whichever way this failed (transcription error,
+  // or -- before the Fix 1 retry bug was fixed -- a doomed retry), this
+  // specific recording either wasn't analysed or can't be retried from here.
+  // The take itself may still be sitting in memory, but this screen has no
+  // way to tell the user that truthfully in general, so it doesn't promise
+  // recovery it can't guarantee.
+  return 'Your recording from this attempt couldn’t be analysed. You can try again, or go back to home.';
 }
