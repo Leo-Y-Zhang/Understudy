@@ -15,7 +15,7 @@ with a verified test cycle and a pushed commit.
 - [x] T2 Core types + config
 - [x] T3 Vendor model assets
 - [x] T4 Face math (pose Euler + iris gaze)
-- [ ] T5 Gaze / eye-contact detector
+- [x] T5 Gaze / eye-contact detector
 - [ ] T6 Blink + burst detector
 - [ ] T7 Expression-event detector
 - [ ] T8 Head-steadiness detector
