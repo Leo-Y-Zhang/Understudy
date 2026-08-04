@@ -1,13 +1,15 @@
 # Session Handoff — Understudy
 
-**State:** measurement core in progress; capture math + vendored models landed.
+**State: v1 SHIPPED.** Live at https://leo-y-zhang.github.io/Understudy/ —
+CI and Pages deploy green on `main`, zero open security alerts, full test
+pyramid (unit / integration / E2E incl. a real recording + on-device
+transcription run with a zero-successful-off-origin-requests assertion).
 
-**Source of truth for execution:**
-`docs/superpowers/plans/2026-08-04-understudy-v1.md` — 17 tasks, executed in
-order (T5–T10 may run in parallel once T2 and T4 are done). Each task ends
-with a verified test cycle and a pushed commit.
-
-**Next action:** execute Task 5 (gaze detector) once T4 review closes.
+**Plan executed in full:**
+`docs/superpowers/plans/2026-08-04-understudy-v1.md` — all 17 tasks, each
+with a TDD cycle and an independent review; followed by a security review,
+an adversarial test pass, and a final whole-branch review whose must-fix
+list has been applied and verified.
 
 ## Task board
 
@@ -27,10 +29,32 @@ with a verified test cycle and a pushed commit.
 - [x] T14 Session flow UI (consent -> processing)
 - [x] T15 Replay screen (timeline + scorecard)
 - [x] T16 Persistence + dashboard
-- [ ] T17 E2E, a11y, CI-complete, Pages deploy
+- [x] T17 E2E, a11y, CI-complete, Pages deploy
 
-## Needs a human (queued, non-blocking)
+## Post-v1 queue (deliberate, none blocking)
 
-- **2-minute webcam calibration** after T12: open the dev HUD, confirm
-  yaw/gaze sign conventions and blink meter against a real face. The build
-  proceeds on documented conventions + round-trip tests meanwhile.
+- **Manual webcam pass (~5 min, needs a human):** verify the face-math sign
+  conventions against a real face (documented as tentative in
+  `src/capture/facemath.ts`), and confirm event-click seeking works on a
+  real MediaRecorder webm replay.
+- **Product decision:** discard sub-~3s takes or add per-session delete
+  (`db.ts` already ships `deleteSession`); currently a mis-tap take stays in
+  the trend until a full wipe.
+- Gate the Pages deploy on CI success (today they run in parallel).
+- Cross-browser verification beyond Chromium (Safari/Firefox: recording
+  container, ORT wasm path).
+- Spec §6 drift, accepted for v1: no separate camera-check/setup screen;
+  recording auto-starts when the thinking timer expires; dashboard omits
+  "best/worst moments" and "streaks".
+- Spec §5 drift: Whisper-timestamp cross-check of VAD segment boundaries
+  was not built (RMS-only VAD).
+
+## Conventions that must not be "fixed"
+
+- Word-level timings are segment-real but interpolated (the vendored q8
+  decoder has no cross-attention outputs) — documented in `src/speech/asr.ts`
+  and the README; do not claim per-word precision.
+- The consent screen and README describe a MediaPipe telemetry attempt that
+  the page CSP blocks — that copy is deliberately honest; do not simplify it
+  back to a false absolute.
+- The honest-limits section (README + consent) is permanent product policy.
