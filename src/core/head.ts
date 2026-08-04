@@ -98,34 +98,25 @@ export function headSteadiness(
     }
   }
 
-  // Merge adjacent OR overlapping fidgety regions. "Adjacent" means the next region
-  // starts within one frame interval of where the current one ends.
-  const mergedRegions: Array<{ t0: number; t1: number }> = [];
-  for (const region of fidgetyWindows) {
-    if (mergedRegions.length === 0) {
-      mergedRegions.push({ ...region });
-    } else {
-      const last = mergedRegions[mergedRegions.length - 1]!;
-      if (region.t0 <= last.t1 + FRAME_INTERVAL_S) {
-        last.t1 = Math.max(last.t1, region.t1);
-      } else {
-        mergedRegions.push({ ...region });
-      }
-    }
-  }
-
-  // Trim each merged region down to the FIRST and LAST individual speed sample inside
-  // it whose speed exceeds the same fidgetyThreshold. This is what stops an event from
+  // Trim each RAW fidgety window down to the FIRST and LAST individual speed sample
+  // inside it whose speed exceeds the same fidgetyThreshold, dropping windows with no
+  // qualifying sample (in practice unreachable, since RMS > threshold implies some
+  // sample > threshold, but guarded defensively). This is what stops an event from
   // ballooning by roughly a window-width on each side: the window scan above finds
   // where shaking-adjacent windows are, but the final reported span should cover only
-  // the samples that actually shook. Regions with no qualifying sample are dropped
-  // (in practice unreachable, since RMS > threshold implies some sample > threshold,
-  // but guarded defensively).
+  // the samples that actually shook.
   //
-  // Regions and speeds are both time-ordered, so a single running pointer suffices -
-  // no need to rescan from the start of speeds for each region.
+  // Trimming MUST happen before the adjacency merge below, not after: the raw windows
+  // are still padded by up to ~headWindowS on each side, so merging on raw regions can
+  // bridge a calm gap between two genuinely separate fidget episodes into one inflated
+  // event (e.g. a 4.0s calm gap being swallowed into a single "restless 8.0s" event).
+  // Trimming first means the merge only ever sees the true shake boundaries.
+  //
+  // Windows and speeds are both time-ordered, so a single running pointer suffices -
+  // no need to rescan from the start of speeds for each window.
+  const trimmedRegions: Array<{ t0: number; t1: number }> = [];
   let scanIdx = 0;
-  for (const region of mergedRegions) {
+  for (const region of fidgetyWindows) {
     while (scanIdx < speeds.length && speeds[scanIdx]!.t < region.t0) {
       scanIdx++;
     }
@@ -148,11 +139,33 @@ export function headSteadiness(
       continue;
     }
 
-    const duration = trimmedT1 - trimmedT0;
+    trimmedRegions.push({ t0: trimmedT0, t1: trimmedT1 });
+  }
+
+  // Merge adjacent OR overlapping TRIMMED regions. "Adjacent" means the next region
+  // starts within one frame interval of where the current one ends. Running this on
+  // trimmed spans (instead of the raw, window-padded regions) is what keeps two
+  // genuinely separate fidget episodes from fusing across the calm gap between them.
+  const mergedRegions: Array<{ t0: number; t1: number }> = [];
+  for (const region of trimmedRegions) {
+    if (mergedRegions.length === 0) {
+      mergedRegions.push({ ...region });
+    } else {
+      const last = mergedRegions[mergedRegions.length - 1]!;
+      if (region.t0 <= last.t1 + FRAME_INTERVAL_S) {
+        last.t1 = Math.max(last.t1, region.t1);
+      } else {
+        mergedRegions.push({ ...region });
+      }
+    }
+  }
+
+  for (const region of mergedRegions) {
+    const duration = region.t1 - region.t0;
 
     events.push({
-      t0: trimmedT0,
-      t1: trimmedT1,
+      t0: region.t0,
+      t1: region.t1,
       type: 'fidget',
       severity: 2,
       detail: `restless ${duration.toFixed(1)}s`,

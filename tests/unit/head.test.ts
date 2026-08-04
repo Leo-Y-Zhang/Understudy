@@ -147,6 +147,47 @@ describe('headSteadiness', () => {
     expect(result.events.length).toBe(1);
   });
 
+  // Adjacency merge (round 2 fix): two shakes separated by a 4.0s CALM gap must be
+  // reported as TWO separate events, not fused into one that spans the calm gap.
+  // Bug: the merge decision ran on raw (window-padded) regions before trimming, so a
+  // gap under ~ (headWindowS * 2 - something) still looked "adjacent" pre-trim and the
+  // two episodes fused into one "restless 8.0s" event despite 6 of those seconds being
+  // calm. The fix reorders trim-then-merge so the merge condition sees the true
+  // (trimmed) gap between shakes.
+  it('keeps two shakes separated by a 4.0s calm gap as two distinct events', () => {
+    const frames = mkFrames([[4, true], [2, true], [4, true], [2, true], [4, true]]);
+
+    const shake1Start = 120; // 4s * 30fps
+    const shake1End = 180;   // 6s * 30fps
+    const shake2Start = 300; // 10s * 30fps
+    const shake2End = 360;   // 12s * 30fps
+
+    const modifiedFrames = frames.map((f, i) => {
+      if (i >= shake1Start && i < shake1End) {
+        const yaw = (i - shake1Start) % 2 === 0 ? 0.05 : 0;
+        return { ...f, yaw };
+      }
+      if (i >= shake2Start && i < shake2End) {
+        const yaw = (i - shake2Start) % 2 === 0 ? 0.05 : 0;
+        return { ...f, yaw };
+      }
+      return f;
+    });
+
+    const result = headSteadiness(modifiedFrames, DEFAULT_CONFIG);
+
+    expect(result.events.length).toBe(2);
+
+    const first = result.events[0]!;
+    const second = result.events[1]!;
+
+    // The two events must not merge across the calm gap, and the calm gap itself
+    // (t=6..10) must not be swallowed into either event's span.
+    expect(first.t1).toBeLessThan(second.t0);
+    expect(first.t1).toBeLessThanOrEqual(6.5);
+    expect(second.t0).toBeGreaterThanOrEqual(9.5);
+  });
+
   // Test 4a: Empty input
   it('returns zeros for empty input', () => {
     const frames: FaceSample[] = [];
