@@ -493,17 +493,17 @@ function buildKeepVideoToggle(wrap: HTMLElement, db: UnderstudyDb, rec: SessionR
     void (async () => {
       checkbox.disabled = true;
       try {
-        if (wantKeep) {
-          await db.saveReplay(rec.id, blob);
-          rec.hasReplay = true;
-          await db.saveSession(rec);
-          note.textContent = 'Video saved with this session, on this device only.';
-        } else {
-          await db.deleteReplay(rec.id);
-          rec.hasReplay = false;
-          await db.saveSession(rec);
-          note.textContent = 'Video removed — the scorecard is still saved.';
-        }
+        // Single readwrite transaction over both stores -- see db.ts's
+        // setSessionReplay doc comment. A failure partway through used to be
+        // able to leave an orphaned blob or a dangling hasReplay from the
+        // old saveReplay/deleteReplay + separate saveSession pair; this is
+        // atomic, so `rec` below only updates once the write has actually
+        // committed.
+        await db.setSessionReplay(rec, wantKeep ? blob : null);
+        rec.hasReplay = wantKeep;
+        note.textContent = wantKeep
+          ? 'Video saved with this session, on this device only.'
+          : 'Video removed — the scorecard is still saved.';
       } catch (err) {
         console.warn('[replay] save toggle failed', err);
         checkbox.checked = !wantKeep;

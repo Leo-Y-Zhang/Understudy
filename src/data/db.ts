@@ -8,7 +8,7 @@
 // exist with or without a saved replay independently -- `hasReplay` on the
 // record is the UI's source of truth for "does this session have a video",
 // while the actual presence of a `replays` row is what deleteSession,
-// deleteReplay and wipeAll act on.
+// setSessionReplay and wipeAll act on.
 //
 // A single connection is opened once and shared by every caller (module-
 // level cache) -- fine here since the schema never needs a version bump
@@ -46,12 +46,16 @@ export interface UnderstudyDb {
   listSessions(): Promise<SessionRecord[]>;
   saveReplay(id: string, blob: Blob): Promise<void>;
   getReplay(id: string): Promise<Blob | null>;
-  /** Removes just the saved video for `id`, leaving its session record (and
-   *  `hasReplay`, which the caller is responsible for updating) untouched.
-   *  Not part of the original four-verb sketch, but needed by replay.ts's
-   *  "keep video" toggle being switched back off after being on -- see
-   *  task-16-report.md. */
-  deleteReplay(id: string): Promise<void>;
+  /** Sets or clears a session's replay and its `hasReplay` flag in a single
+   *  readwrite transaction over both stores, so a mid-write failure can
+   *  never leave an orphaned blob (no matching `hasReplay: true`) or a
+   *  dangling `hasReplay: true` (no matching blob) -- the two used to be
+   *  separate transactions (`saveReplay`/`deleteReplay` + a follow-up
+   *  `saveSession`) via replay.ts's "keep video" toggle; this replaces both.
+   *  `blob` given: put the blob in `replays` and put `{...rec, hasReplay:
+   *  true}` in `sessions`. `blob` null: delete the `replays` row and put
+   *  `{...rec, hasReplay: false}` in `sessions`. */
+  setSessionReplay(rec: SessionRecord, blob: Blob | null): Promise<void>;
   deleteSession(id: string): Promise<void>;
   wipeAll(): Promise<void>;
   exportJson(): Promise<string>;
@@ -135,9 +139,16 @@ export async function openDb(): Promise<UnderstudyDb> {
     return row?.blob ?? null;
   };
 
-  const deleteReplay = async (id: string): Promise<void> => {
-    const tx = db.transaction(REPLAYS_STORE, 'readwrite');
-    tx.objectStore(REPLAYS_STORE).delete(id);
+  const setSessionReplay = async (rec: SessionRecord, blob: Blob | null): Promise<void> => {
+    const tx = db.transaction([SESSIONS_STORE, REPLAYS_STORE], 'readwrite');
+    if (blob) {
+      const row: ReplayRow = { id: rec.id, blob };
+      tx.objectStore(REPLAYS_STORE).put(row);
+      tx.objectStore(SESSIONS_STORE).put({ ...rec, hasReplay: true });
+    } else {
+      tx.objectStore(REPLAYS_STORE).delete(rec.id);
+      tx.objectStore(SESSIONS_STORE).put({ ...rec, hasReplay: false });
+    }
     await txDone(tx);
   };
 
@@ -163,5 +174,5 @@ export async function openDb(): Promise<UnderstudyDb> {
     return JSON.stringify(sessions, null, 2);
   };
 
-  return { saveSession, listSessions, saveReplay, getReplay, deleteReplay, deleteSession, wipeAll, exportJson };
+  return { saveSession, listSessions, saveReplay, getReplay, setSessionReplay, deleteSession, wipeAll, exportJson };
 }

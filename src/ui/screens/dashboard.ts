@@ -22,22 +22,27 @@ import { App, QuestionPack, RunFlags, screenSection } from '../app';
 import { clamp, formatScore } from '../format';
 import { openDb, SessionRecord } from '../../data/db';
 import { SUB_SCORE_LABELS } from './replay';
+import { DRAWN_KEY } from './home';
 
 export interface DashboardProps {
   pack: QuestionPack;
   flags: RunFlags;
 }
 
-// Kept as literals rather than imports: DRAWN_KEY *is* exported by home.ts
-// (in this task's file list) and could be imported directly, but
-// understudy.consent.v1 lives in consent.ts, which is not part of this
-// task's file list -- to keep both keys visibly paired at their one call
-// site (and avoid importing one key but not the other), both are spelled
-// out here with a cross-reference comment instead.
+// CONSENT_KEY stays a literal: it lives in consent.ts, which is not part of
+// this task's file list, so there is nothing importable here -- DRAWN_KEY
+// (home.ts, in scope) is imported above instead of hand-copied.
 const CONSENT_KEY = 'understudy.consent.v1'; // see consent.ts's CONSENT_KEY
-const DRAWN_KEY = 'understudy.drawn.v1'; // see home.ts's DRAWN_KEY
 
 const HISTORY_QUESTION_MAX_CHARS = 70;
+
+// Half of .dash-sub-best-mark's own CSS width (3px) -- the tick is
+// positioned via `left: X%` + `transform: translateX(-50%)`, so at the 0%
+// and 100% extremes that centering shift pushes half the mark past the
+// track's edge, where `.sub-score-track`'s `overflow: hidden` clips it.
+// Clamping `left` between this inset and `calc(100% - inset)` keeps the
+// mark's own edge flush with the track instead of clipped mid-tick.
+const BEST_MARK_HALF_WIDTH_PX = 1.5;
 
 const TREND_VIEW_W = 560;
 const TREND_VIEW_H = 140;
@@ -251,7 +256,8 @@ function buildSubScoreSummary(body: HTMLElement, sessions: SessionRecord[]): voi
     track.appendChild(fill);
     const bestMark = document.createElement('div');
     bestMark.className = 'dash-sub-best-mark';
-    bestMark.style.left = `${clamp(bestValue, 0, 100)}%`;
+    const bestPct = clamp(bestValue, 0, 100);
+    bestMark.style.left = `clamp(${BEST_MARK_HALF_WIDTH_PX}px, ${bestPct}%, calc(100% - ${BEST_MARK_HALF_WIDTH_PX}px))`;
     bestMark.title = `Best: ${formatScore(bestValue)}`;
     track.appendChild(bestMark);
 

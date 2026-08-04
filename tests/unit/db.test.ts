@@ -149,17 +149,30 @@ describe('db', () => {
     expect(await db.getReplay('does-not-exist')).toBeNull();
   });
 
-  it('deleteReplay clears the video but leaves the session record intact', async () => {
+  it('setSessionReplay with a blob puts it in replays and sets hasReplay, in one transaction', async () => {
     const db = await openDb();
-    const rec = mkRecord({ id: 'keep-session', hasReplay: true });
+    const rec = mkRecord({ id: 'atomic-set', hasReplay: false });
     await db.saveSession(rec);
-    await db.saveReplay('keep-session', new Blob(['bytes']));
 
-    await db.deleteReplay('keep-session');
+    await db.setSessionReplay(rec, new Blob(['bytes']));
 
-    expect(await db.getReplay('keep-session')).toBeNull();
+    expect(await db.getReplay('atomic-set')).not.toBeNull();
     const list = await db.listSessions();
     expect(list).toHaveLength(1);
-    expect(list[0]!.id).toBe('keep-session');
+    expect(list[0]!.hasReplay).toBe(true);
+  });
+
+  it('setSessionReplay with null clears the replay and unsets hasReplay, in one transaction', async () => {
+    const db = await openDb();
+    const rec = mkRecord({ id: 'atomic-clear', hasReplay: true });
+    await db.saveSession(rec);
+    await db.saveReplay('atomic-clear', new Blob(['bytes']));
+
+    await db.setSessionReplay(rec, null);
+
+    expect(await db.getReplay('atomic-clear')).toBeNull();
+    const list = await db.listSessions();
+    expect(list).toHaveLength(1);
+    expect(list[0]!.hasReplay).toBe(false);
   });
 });
