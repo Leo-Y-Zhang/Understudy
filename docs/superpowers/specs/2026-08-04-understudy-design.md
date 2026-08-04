@@ -40,7 +40,9 @@ admissions interviews), with a general admissions question pack in v1.
 ## 4. Architecture
 
 Single-page application. Vite + TypeScript, no UI framework. Static deploy
-(GitHub Pages). All heavy inference runs in workers.
+(GitHub Pages). Speech inference (the heavy load) runs post-answer in a Web
+Worker; face landmarking runs on the main thread with GPU delegation — the
+official MediaPipe web pattern, costing milliseconds per frame.
 
 ```
 src/
@@ -88,11 +90,10 @@ browser.
 
 - MediaPipe FaceLandmarker task + WASM: vendored in-repo (~5 MB), served
   same-origin.
-- Whisper tiny.en ONNX: fetched at runtime from the Hugging Face CDN,
-  **pinned to an exact revision**, cached via the browser cache/Cache API.
-  CSP `connect-src` allows only that host; no user data ever flows out —
-  model downloads are inbound only. (Roadmap: self-host to reach
-  `connect-src 'self'`.)
+- Whisper tiny.en ONNX (q8, ~40 MB): **vendored in-repo** and served
+  same-origin, like the MediaPipe assets. The shipped CSP is therefore
+  `connect-src 'self'` — at runtime the app makes zero requests to any
+  external host, verifiable in the network tab.
 
 ## 5. Measurement layer (core)
 
@@ -145,9 +146,9 @@ one documented `config.ts` and is tunable.
 
 ## 7. Data & privacy
 
-- No network transmission of user data, ever. CSP pins `connect-src` to
-  same-origin + the pinned model host; no analytics, no fonts, no CDNs
-  beyond the model host.
+- No network transmission of any kind beyond the origin. CSP pins
+  `connect-src` to `'self'`; no analytics, no fonts, no CDNs. Every asset,
+  including ML models, is served from the site itself.
 - Replay blobs are in-memory by default; saving a replay to IndexedDB is
   explicit opt-in per session. Metrics-only history is stored locally.
 - Full wipe and JSON export (metrics only) in the dashboard.
