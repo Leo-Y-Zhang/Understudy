@@ -4,11 +4,12 @@ import { consentScreen, hasConsented } from './ui/screens/consent';
 import { homeScreen } from './ui/screens/home';
 import { questionScreen } from './ui/screens/question';
 import { sessionScreen } from './ui/screens/session';
-import { processingScreen, resultsScreen } from './ui/screens/processing';
+import { processingScreen } from './ui/screens/processing';
+import { replayScreen } from './ui/screens/replay';
 import generalAdmissionsPack from './packs/general-admissions.json';
 
 // Session flow: consent -> home -> question -> session -> processing ->
-// (temporary) results. `?mock=1` swaps every capture/transcription
+// replay (annotated timeline + scorecard). `?mock=1` swaps every capture/transcription
 // dependency for deterministic in-memory stand-ins so the whole flow can be
 // exercised without a camera, a microphone, or the Whisper model; `&fast=1`
 // additionally speeds up the mock face tracker's virtual clock. Consent is
@@ -36,7 +37,7 @@ function main(): void {
   app.register('question', questionScreen);
   app.register('session', sessionScreen);
   app.register('processing', processingScreen);
-  app.register('results', resultsScreen);
+  app.register('replay', replayScreen);
 
   const canSkipConsent = !flags.mock && hasConsented();
   if (canSkipConsent) {

@@ -17,6 +17,7 @@ export type Screen<P = void> = (app: App, props: P) => HTMLElement;
 export class App {
   private readonly screens = new Map<string, Screen<unknown>>();
   private current: HTMLElement | null = null;
+  private currentCleanup: (() => void) | null = null;
 
   constructor(private readonly root: HTMLElement) {}
 
@@ -30,10 +31,26 @@ export class App {
       throw new Error(`App.show: no screen registered as "${name}"`);
     }
 
+    this.currentCleanup?.();
+    this.currentCleanup = null;
+
     const section = screen(this, props);
     this.root.replaceChildren(section);
     this.current = section;
     focusHeading(section);
+  }
+
+  /**
+   * Registers a callback that runs exactly once, the next time the current
+   * screen is torn down (another screen replacing it via `show()`). There is
+   * no other unmount lifecycle -- `show()` just swaps DOM children -- so a
+   * screen holding a resource that outlives its own DOM node (an object URL,
+   * a ResizeObserver, a timer) calls this once while building its section to
+   * get a guaranteed teardown point. Only one cleanup is tracked at a time; a
+   * screen that needs more than one should fold them into a single function.
+   */
+  onExit(cleanup: () => void): void {
+    this.currentCleanup = cleanup;
   }
 
   /** The currently-mounted screen's root element, if any -- mainly for tests/probes. */

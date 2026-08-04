@@ -1,27 +1,16 @@
 // Processing screen: transcribes the recording (determinate progress from
 // whisperClient's onProgress, or the canned mock words with no network/model
 // at all), then runs analyzeSession (fast enough to need no spinner), then
-// hands off to a TEMPORARY results view. T15 replaces that results view
-// with the real replay screen; this one only proves the pipeline works.
+// hands off to the replay screen (annotated timeline + scorecard).
 
-import { App, QuestionPack, QuestionSpec, RunFlags, screenSection } from '../app';
-import { formatElapsed, formatPercent, formatScore } from '../format';
+import { App, screenSection } from '../app';
+import { formatPercent } from '../format';
 import { transcribe } from '../../speech/whisperClient';
 import { analyzeSession } from '../../core/analyze';
 import { mockWords } from '../../mock/mockData';
 import type { ProcessingHandoff } from './session';
-import type { SessionAnalysis, SubScores } from '../../core/types';
 
 const MOCK_STEP_PAUSE_MS = 250;
-
-const SUB_SCORE_LABELS: Array<[key: keyof SubScores, label: string]> = [
-  ['eyeContact', 'Eye contact'],
-  ['blinkSteadiness', 'Blink steadiness'],
-  ['expressionControl', 'Expression control'],
-  ['headSteadiness', 'Head steadiness'],
-  ['pace', 'Pace'],
-  ['fluency', 'Fluency'],
-];
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -92,7 +81,7 @@ export function processingScreen(app: App, props: ProcessingHandoff): HTMLElemen
         durationS: result.durationS,
       });
 
-      app.show('results', {
+      app.show('replay', {
         question,
         packId: pack.id,
         pack,
@@ -130,64 +119,4 @@ function requireAudio(audio16k: Float32Array | null): Float32Array {
 function describeProcessingError(err: unknown): string {
   void err;
   return 'We couldn’t finish reviewing that take. Nothing was lost — try again, or rehearse once more if this keeps happening.';
-}
-
-// --- Temporary results stub (T15 replaces this with the full replay screen) ---
-
-export interface ResultsProps {
-  question: QuestionSpec;
-  packId: string;
-  pack: QuestionPack;
-  startedAt: number;
-  durationS: number;
-  analysis: SessionAnalysis;
-  replayBlob: Blob | null;
-  flags: RunFlags;
-}
-
-export function resultsScreen(app: App, props: ResultsProps): HTMLElement {
-  const { pack, analysis, durationS, flags } = props;
-  const { section, body } = screenSection('results', 'How that went');
-
-  const badge = document.createElement('p');
-  badge.className = 'badge';
-  badge.textContent = 'Scorecard only — full replay coming soon';
-  body.appendChild(badge);
-
-  const composureWrap = document.createElement('div');
-  composureWrap.className = 'composure';
-  const composureNumber = document.createElement('span');
-  composureNumber.className = 'composure-number';
-  composureNumber.textContent = formatScore(analysis.composure);
-  const composureLabel = document.createElement('span');
-  composureLabel.className = 'composure-label';
-  composureLabel.textContent = 'Composure';
-  composureWrap.append(composureNumber, composureLabel);
-  body.appendChild(composureWrap);
-
-  const subList = document.createElement('dl');
-  subList.className = 'sub-scores';
-  for (const [key, label] of SUB_SCORE_LABELS) {
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    dd.textContent = formatScore(analysis.sub[key]);
-    subList.append(dt, dd);
-  }
-  body.appendChild(subList);
-
-  const summary = document.createElement('p');
-  summary.className = 'results-summary';
-  const eventWord = analysis.events.length === 1 ? 'moment' : 'moments';
-  summary.textContent = `${analysis.events.length} ${eventWord} flagged across ${formatElapsed(durationS)} of answer.`;
-  body.appendChild(summary);
-
-  const again = document.createElement('button');
-  again.type = 'button';
-  again.className = 'btn btn-primary btn-large';
-  again.textContent = 'Rehearse again';
-  again.addEventListener('click', () => app.show('home', { pack, flags }));
-  body.appendChild(again);
-
-  return section;
 }
