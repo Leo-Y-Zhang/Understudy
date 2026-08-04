@@ -543,7 +543,14 @@ a {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  color: var(--color-text-muted);
+  /* Deliberately NOT var(--color-text-muted): .preview-wrap's background
+     (#050603) is a fixed near-black "viewfinder" colour in both themes, not
+     var(--color-bg) -- so the light theme's muted text colour (#5b5f4e,
+     tuned for the light --color-bg) reads at only 3.08:1 here (axe: serious
+     color-contrast failure). This is always light text on that fixed dark
+     background, in either theme, so it uses a fixed colour of its own
+     (~7.5:1 against #050603) instead of the theme-relative variable. */
+  color: #9aa08c;
   font-size: var(--text-sm);
 }
 

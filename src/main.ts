@@ -17,8 +17,15 @@ import generalAdmissionsPack from './packs/general-admissions.json';
 // for deterministic in-memory stand-ins so the whole flow can be exercised
 // without a camera, a microphone, or the Whisper model; `&fast=1`
 // additionally speeds up the mock face tracker's virtual clock. Consent is
-// always the first screen on a mock run (and never persists), and the first
-// screen on any run that hasn't accepted it yet before.
+// always the first screen on a mock run, and the first screen on any run
+// that hasn't accepted it yet before. Mock sessions DO persist like any
+// other -- home.ts's drawn-question tracking and replay.ts's auto-save both
+// run unconditionally regardless of flags.mock, by design: it's what makes
+// the mock journey usable as a real end-to-end smoke test of the save path
+// (see tests/e2e/journey.spec.ts and mock/mockData.ts's header). The
+// consent screen's copy (consent.ts) already describes this correctly --
+// this comment used to claim the opposite ("and never persists"), which was
+// wrong and has been corrected here to match.
 
 function parseFlags(): RunFlags {
   const params = new URLSearchParams(location.search);

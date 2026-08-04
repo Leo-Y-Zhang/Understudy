@@ -179,4 +179,23 @@ describe('detectBlinks', () => {
 
     expect(result.blinkTimes.length).toBe(2);
   });
+
+  // Test 8: D4 regression -- durationS must come from real frame timestamps,
+  // not an assumed 30fps. Real capture runs at whatever rate the camera and
+  // per-frame face-tracking inference sustain (commonly 15fps or lower on a
+  // laptop webcam) -- `frames.length / 30` silently inflates the reported
+  // rate by (30 / actual fps). Same 60s session, same 17 well-spaced blinks
+  // (no bursts: >3s apart, well over burstWindowS=2.0), built at 15fps
+  // instead of 30fps -- must still read ~17/min, not ~34/min.
+  it('reports the correct blinks/min at 15fps, not inflated by an assumed 30fps', () => {
+    const blinkTimesS = Array.from({ length: 17 }, (_, i) => 1 + i * 3.5); // 1..57.0, 17 blinks
+    const frames = mkFrames([[60, true]], 15);
+    const framesWithBlinks = withBlinks(frames, blinkTimesS, 15);
+
+    const result = detectBlinks(framesWithBlinks, DEFAULT_CONFIG);
+
+    expect(result.blinkTimes.length).toBe(17);
+    expect(result.events.length).toBe(0); // no bursts at 3.5s spacing
+    expect(Math.round(result.blinksPerMin)).toBe(17);
+  });
 });

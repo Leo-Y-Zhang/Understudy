@@ -16,6 +16,18 @@ import type { FaceSample, RmsSeries } from '../../core/types';
 
 const ELAPSED_TICK_MS = 250;
 
+// D10 fix: real (non-mock) capture has a genuinely irreplaceable take in
+// flight from the moment recording starts -- browser Back or a reload
+// silently discards it, with no warning of any kind. Mock mode is exempt:
+// there is nothing real to lose, and warning on every mock E2E run would
+// be pure noise. Registered once recording actually starts, removed via
+// app.onExit (fires on any app.show() away from this screen, including
+// the normal Stop -> processing handoff).
+function preventUnload(ev: BeforeUnloadEvent): void {
+  ev.preventDefault();
+  ev.returnValue = '';
+}
+
 export interface SessionProps {
   pack: QuestionPack;
   question: QuestionSpec;
@@ -181,6 +193,11 @@ export function sessionScreen(app: App, props: SessionProps): HTMLElement {
       status.hidden = true;
       indicator.hidden = false;
       stopBtn.disabled = false;
+
+      if (!flags.mock) {
+        window.addEventListener('beforeunload', preventUnload);
+        app.onExit(() => window.removeEventListener('beforeunload', preventUnload));
+      }
 
       elapsedHandle = setInterval(() => {
         elapsed.textContent = formatElapsed((Date.now() - startedAt) / 1000);

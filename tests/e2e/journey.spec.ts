@@ -32,10 +32,17 @@ test.describe('mock rehearsal journey', () => {
     await expect(page.locator('[data-screen="session"]')).toBeVisible();
     await expect(page.locator('.rec-indicator')).toBeVisible();
 
-    // Let the fast mock clock run past its scripted gaze-break and
-    // blink-burst (virtual t up to 31s, compressed into well under 2s of
-    // real time by &fast=1).
-    await page.waitForTimeout(2000);
+    // Let the fast mock clock run past its scripted gaze-break (t=10-12s)
+    // AND its blink-burst (t=30.0-31.0s, four blinks -- see
+    // src/mock/mockTracker.ts's BLINK_PULSES). `&fast=1` runs MockTracker's
+    // setInterval at 1ms, but browsers clamp nested timers to >=4ms, so this
+    // buys ~6-8x real time in practice, not the ~33x a naive "1ms tick"
+    // reading suggests (measured: 2.06s real -> 0:17 virtual, 5.07s real ->
+    // 0:30 virtual). 8s real time comfortably clears virtual t=31s even at
+    // the slowest observed rate (~5.9x), which a 2s wait never did -- so the
+    // burst branch of core/blink.ts, and its timeline lane, previously had
+    // no E2E coverage at all despite this comment's old claim otherwise.
+    await page.waitForTimeout(8000);
 
     // Stop -> Processing -> Replay.
     await page.getByRole('button', { name: 'Stop' }).click();
@@ -46,6 +53,14 @@ test.describe('mock rehearsal journey', () => {
     const eventItems = page.locator('.event-list-wrap .event-list li');
     await expect(eventItems.first()).toBeVisible();
     expect(await eventItems.count()).toBeGreaterThanOrEqual(1);
+
+    // The scripted blink-burst specifically fired and was recognised --
+    // previously unreachable in under 2s of real time (see the comment
+    // above), so this event type had zero E2E coverage before now. Scoped
+    // to the accessible event list, not a bare page-wide text match: the
+    // decorative (aria-hidden) timeline legend also has a "Blink burst"
+    // label, which would otherwise make this locator ambiguous.
+    await expect(page.locator('.event-list-wrap .event-list').getByText('Blink burst', { exact: false })).toBeVisible();
 
     // The scorecard shows a composure number, and the session auto-saved.
     await expect(page.locator('.composure-number')).toHaveText(/\d+(\.\d)?/);

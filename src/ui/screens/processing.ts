@@ -16,9 +16,25 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// D10 fix, same reasoning as session.ts's preventUnload: a real recording
+// has already been captured by the time this screen mounts, and it isn't
+// saved anywhere durable until replay.ts's auto-save runs -- a reload here
+// (including while sitting on the error panel; "Try again" only exists
+// because the audio is still in memory) silently loses it. Mock mode is
+// exempt, same reasoning as session.ts.
+function preventUnload(ev: BeforeUnloadEvent): void {
+  ev.preventDefault();
+  ev.returnValue = '';
+}
+
 export function processingScreen(app: App, props: ProcessingHandoff): HTMLElement {
   const { pack, question, flags, startedAt, result } = props;
   const { section, body } = screenSection('processing', 'Reviewing your take');
+
+  if (!flags.mock) {
+    window.addEventListener('beforeunload', preventUnload);
+    app.onExit(() => window.removeEventListener('beforeunload', preventUnload));
+  }
 
   const stepLabel = document.createElement('p');
   stepLabel.className = 'processing-step';
@@ -42,11 +58,22 @@ export function processingScreen(app: App, props: ProcessingHandoff): HTMLElemen
   errorPanel.setAttribute('role', 'alert');
   const errorText = document.createElement('p');
   errorPanel.appendChild(errorText);
+  const errorActions = document.createElement('div');
+  errorActions.className = 'actions';
   const retryBtn = document.createElement('button');
   retryBtn.type = 'button';
   retryBtn.className = 'btn btn-primary';
   retryBtn.textContent = 'Try again';
-  errorPanel.appendChild(retryBtn);
+  // Matches session.ts's error panel: on a persistent failure (e.g. no
+  // audio was captured, or the model can never load), "Try again" fails
+  // identically forever -- "Back to home" is the only real way out.
+  const homeBtn = document.createElement('button');
+  homeBtn.type = 'button';
+  homeBtn.className = 'btn btn-ghost';
+  homeBtn.textContent = 'Back to home';
+  homeBtn.addEventListener('click', () => app.show('home', { pack, flags }));
+  errorActions.append(retryBtn, homeBtn);
+  errorPanel.appendChild(errorActions);
   body.appendChild(errorPanel);
 
   const setProgress = (p: number): void => {

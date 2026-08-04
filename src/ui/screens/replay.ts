@@ -36,6 +36,17 @@ export interface ReplayProps {
    * a fresh session, which auto-saves itself on mount -- see buildSavePanel.
    */
   readonly?: boolean;
+  /**
+   * True when this record's `hasReplay` was true but no matching video
+   * could be loaded (the `replays` row is missing, or reading it failed) --
+   * i.e. a video WAS captured for this session and is gone, as opposed to
+   * `replayBlob` being null because this mode/session never captured one at
+   * all. Only dashboard.ts's openReplayFromRecord can tell these apart (it
+   * has `rec.hasReplay` to compare against); changes the placeholder/hint
+   * copy below to say so honestly instead of the generic "no video
+   * captured in this mode".
+   */
+  replayMissing?: boolean;
 }
 
 /** Exported so the dashboard's "latest vs. best" rows use the exact same
@@ -68,13 +79,13 @@ const CANVAS_HEIGHT_PX =
   TIMELINE_LANE_ORDER.length * LANE_HEIGHT_PX + (TIMELINE_LANE_ORDER.length - 1) * LANE_GAP_PX;
 
 export function replayScreen(app: App, props: ReplayProps): HTMLElement {
-  const { pack, analysis, durationS, replayBlob, flags, readonly } = props;
+  const { pack, analysis, durationS, replayBlob, flags, readonly, replayMissing } = props;
   const { section, body } = screenSection('replay', 'Your replay');
   section.classList.add('screen-replay');
 
-  const video = buildVideoPanel(app, body, replayBlob);
+  const video = buildVideoPanel(app, body, replayBlob, replayMissing);
   buildTimeline(body, analysis.events, durationS, video);
-  buildEventList(body, analysis.events, video);
+  buildEventList(body, analysis.events, video, replayMissing);
   buildScorecard(body, props);
   if (!readonly) buildSavePanel(body, props);
   buildActions(app, body, pack, flags, readonly);
@@ -84,7 +95,12 @@ export function replayScreen(app: App, props: ReplayProps): HTMLElement {
 
 // --- Video panel ------------------------------------------------------
 
-function buildVideoPanel(app: App, body: HTMLElement, replayBlob: Blob | null): HTMLVideoElement | null {
+function buildVideoPanel(
+  app: App,
+  body: HTMLElement,
+  replayBlob: Blob | null,
+  replayMissing?: boolean
+): HTMLVideoElement | null {
   const wrap = document.createElement('div');
   wrap.className = 'replay-video-wrap';
 
@@ -95,7 +111,9 @@ function buildVideoPanel(app: App, body: HTMLElement, replayBlob: Blob | null): 
     icon.className = 'replay-video-placeholder-icon';
     icon.setAttribute('aria-hidden', 'true');
     const text = document.createElement('p');
-    text.textContent = 'No video captured in this mode';
+    text.textContent = replayMissing
+      ? 'Your video is no longer available'
+      : 'No video captured in this mode';
     placeholder.append(icon, text);
     wrap.appendChild(placeholder);
     body.appendChild(wrap);
@@ -259,7 +277,12 @@ function fillRoundedRect(
 
 // --- Accessible event list ----------------------------------------------
 
-function buildEventList(body: HTMLElement, events: DeliveryEvent[], video: HTMLVideoElement | null): void {
+function buildEventList(
+  body: HTMLElement,
+  events: DeliveryEvent[],
+  video: HTMLVideoElement | null,
+  replayMissing?: boolean
+): void {
   const wrap = document.createElement('div');
   wrap.className = 'event-list-wrap';
 
@@ -280,8 +303,9 @@ function buildEventList(body: HTMLElement, events: DeliveryEvent[], video: HTMLV
   if (!video) {
     const hint = document.createElement('p');
     hint.className = 'event-list-hint';
-    hint.textContent =
-      'No video was captured in this mode, so these can’t be seeked to — the timestamps and details below are still accurate.';
+    hint.textContent = replayMissing
+      ? 'Your video is no longer available, so these can’t be seeked to — the timestamps and details below are still accurate.'
+      : 'No video was captured in this mode, so these can’t be seeked to — the timestamps and details below are still accurate.';
     wrap.appendChild(hint);
   }
 
@@ -311,7 +335,7 @@ function buildEventList(body: HTMLElement, events: DeliveryEvent[], video: HTMLV
       });
     } else {
       btn.setAttribute('aria-disabled', 'true');
-      btn.title = 'No video captured in this mode';
+      btn.title = replayMissing ? 'Your video is no longer available' : 'No video captured in this mode';
     }
 
     item.appendChild(btn);

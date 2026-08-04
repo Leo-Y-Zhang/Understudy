@@ -341,16 +341,31 @@ async function openReplayFromRecord(app: App, pack: QuestionPack, flags: RunFlag
     }
   }
 
+  // `rec.hasReplay` true but the blob came back null (deleted `replays` row,
+  // or the getReplay() call above failed): a video WAS captured and is now
+  // gone, a different -- and more honest -- message than "no video captured
+  // in this mode" (which is only true when hasReplay was false all along).
+  const replayMissing = rec.hasReplay && !blob;
+
   app.show('replay', {
     question: { id: rec.questionId, text: rec.questionText, thinkingS: 0, suggestedAnswerS: 0 },
     packId: rec.packId,
     pack,
     startedAt: rec.startedAt,
     durationS: rec.durationS,
-    analysis: { events: rec.events, sub: rec.sub, composure: rec.composure, stats: rec.stats },
+    // `rec.events ?? []`: defensive against a record written by an earlier
+    // schema than this build expects (no record version, no read-side
+    // validation exists yet -- see db.ts's DB_VERSION). Without this, a
+    // record missing `events` throws inside layoutTimeline's/buildEventList's
+    // .map()/.length deep in replayScreen's synchronous render, before
+    // App.show reaches replaceChildren -- the history row then looks
+    // clickable and silently does nothing, forever, with uncaught errors
+    // in the console.
+    analysis: { events: rec.events ?? [], sub: rec.sub, composure: rec.composure, stats: rec.stats },
     replayBlob: blob,
     flags,
     readonly: true,
+    replayMissing,
   });
 }
 

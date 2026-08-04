@@ -109,7 +109,7 @@ function findGazeBreakEvents(
 
   // Handle case where session ends in off state
   if (offStart !== null && offStartFrameIdx !== null) {
-    const offEnd = frames[frames.length - 1]!.t + 1 / 30;
+    const offEnd = frames[frames.length - 1]!.t + 1 / 30; // end time is last frame + frame duration
     const duration = offEnd - offStart;
 
     if (duration >= gazeBreakMinS) {

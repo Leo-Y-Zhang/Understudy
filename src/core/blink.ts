@@ -44,10 +44,21 @@ export function detectBlinks(frames: FaceSample[], cfg: UnderstudyConfig): Blink
     }
   }
 
-  // Step 2: Calculate blinks per minute
-  // (frames.length > 0 is guaranteed here by the early return above)
-  const durationS = frames.length / 30;
-  const blinksPerMin = (blinkTimes.length / durationS) * 60;
+  // Step 2: Calculate blinks per minute, from the real elapsed span between
+  // the first and last frame -- NOT frames.length / 30. Real capture runs
+  // at whatever rate the camera and per-frame face-tracking inference
+  // sustain (commonly 15fps or lower on a laptop webcam, sometimes less on
+  // the CPU delegate fallback), not a fixed 30fps, so frames.length/30
+  // silently inflates or deflates the reported rate by (30 / actual fps) --
+  // e.g. a genuine 17 blinks/min at 15fps used to read as 34/min. See
+  // core/head.ts's FRAME_INTERVAL_S and core/gaze.ts's two `+ 1/30`
+  // end-of-run nudges for the acceptable uses of a fixed 1/30 elsewhere in
+  // this module family -- both are per-event boundary/merge tolerances
+  // (negligible either way), never a session-spanning DURATION like this.
+  // (frames.length > 0 is guaranteed here by the early return above; a
+  // single-frame session has no elapsed span, hence the >= 2 guard.)
+  const durationS = frames.length >= 2 ? frames[frames.length - 1]!.t - frames[0]!.t : 0;
+  const blinksPerMin = durationS > 0 ? (blinkTimes.length / durationS) * 60 : 0;
 
   // Step 3: Detect burst clusters (sliding window: >= burstCount onsets within burstWindowS)
   const events: DeliveryEvent[] = [];

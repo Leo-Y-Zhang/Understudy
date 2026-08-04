@@ -103,6 +103,25 @@ test.describe('real (non-mock) session', () => {
     // all spin up here (see src/ui/screens/session.ts's start()).
     await expect(page.locator('.rec-indicator')).toBeVisible({ timeout: 30_000 });
 
+    // D10 regression: browser Back or a reload mid-recording used to
+    // silently discard the take with no warning at all (session.ts had no
+    // beforeunload guard). Dispatching a synthetic, cancelable
+    // 'beforeunload' event and reading window.dispatchEvent()'s own return
+    // value (false iff some listener called preventDefault()) proves the
+    // guard is actually installed, without triggering a real navigation or
+    // needing to handle a native dialog. Polled rather than checked once:
+    // the guard is installed in the same synchronous turn that flips
+    // .rec-indicator visible, but MediaPipe's own WASM/graph startup
+    // logging around that exact moment can leave a very short externally-
+    // observable gap between "indicator visible" and "listener attached"
+    // becoming visible to the CDP session driving this test.
+    await expect
+      .poll(() => page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true }))), {
+        message: 'waiting for the beforeunload guard to be installed while recording',
+        timeout: 5_000,
+      })
+      .toBe(true);
+
     // Real time on the clock: the fake mic is playing the WAV fixture
     // (~14s of real speech, see tests/integration/whisper.test.ts), so the
     // recorded audio needs to actually span that long to capture it.
