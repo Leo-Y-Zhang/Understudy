@@ -2,29 +2,97 @@
 
 **Rehearse the interview. See your delivery.**
 
-Understudy is a privacy-first interview rehearsal studio that runs entirely in
-your browser. Answer real admissions-interview questions on camera and get
-immediate, timestamped feedback on your delivery — eye contact, blink
-behaviour, expression events, head steadiness, pace, filler words, and pauses
-— with an annotated replay and a score trend across sessions.
+**Live: [leo-y-zhang.github.io/Understudy](https://leo-y-zhang.github.io/Understudy/)** — works in any modern desktop browser, no install, no account.
 
-**Nothing you record ever leaves your device.** No backend, no account, no API
-key, no analytics. Face landmarking (MediaPipe) and speech recognition
-(Whisper) run on-device, in the browser. You can verify this yourself in the
-network tab.
+Understudy is an interview rehearsal studio that runs entirely in your
+browser. Answer real admissions-interview questions on camera and get
+immediate, timestamped feedback on your **delivery** — eye contact, blink
+behaviour, transient expression events, head steadiness, speaking pace,
+filler words, and pauses — with an annotated replay of your answer and a
+score trend across practice sessions.
 
-## Status
+| | |
+|---|---|
+| ![Annotated replay with timeline and scorecard](docs/media/replay-light.png) | ![Progress dashboard with composure trend](docs/media/dashboard.png) |
 
-In active development. Design spec:
-[`docs/superpowers/specs/2026-08-04-understudy-design.md`](docs/superpowers/specs/2026-08-04-understudy-design.md)
+## Nothing you record ever leaves your device
+
+There is no backend, no account, no API key, and no analytics. Face
+landmarking (MediaPipe FaceLandmarker) and speech recognition (Whisper
+tiny.en) run **on-device, in the browser** — every model file is served from
+this site itself.
+
+**Verify it yourself:** open devtools → Network tab → record a full session.
+Every request stays on this site's origin. The page's Content-Security-Policy
+pins `connect-src 'self'`, and a Playwright test in CI fails the build if any
+request leaves the origin during a full session.
+
+Recordings and scores live only in your browser (in-memory; saved history in
+IndexedDB, opt-in per session for video). The dashboard has one-click export
+(JSON, metrics only) and a full wipe.
+
+## How it works
+
+```mermaid
+flowchart LR
+    cam[Camera] --> fl["FaceLandmarker\n(MediaPipe, on-device)"]
+    fl --> fs["FaceSample stream\nblendshapes + pose + gaze"]
+    mic[Microphone] --> rms["AudioWorklet\nRMS series"]
+    mic --> rec[MediaRecorder]
+    rec --> wh["Whisper tiny.en\n(transformers.js, on-device,\npost-answer)"]
+    wh --> words["Timed words"]
+    fs --> core
+    rms --> core
+    words --> core
+    core["Pure measurement core\n(typed, deterministic,\n95 unit tests)"] --> ev["Delivery events\n+ scores"]
+    ev --> replay["Annotated replay\n+ scorecard + trends"]
+```
+
+The measurement core is pure TypeScript — time-series in, events and scores
+out, no DOM, no I/O — which makes every detector unit-testable against
+synthetic fixtures. What it measures:
+
+| Signal | From | Reported as |
+|---|---|---|
+| Eye contact | iris + head pose | contact %, timestamped gaze breaks |
+| Blink behaviour | eye blendshapes | blinks/min, blink bursts |
+| Expression events | brow/lip/smile blendshapes vs rolling baseline | brief expression events |
+| Head steadiness | pose matrix motion | fidget index, restless spans |
+| Pace | word timestamps | WPM + variability |
+| Fluency | transcript + voice activity | filler words, long pauses |
+
+Six sub-scores combine into a single **Composure** score you can track
+across sessions.
 
 ## Honest limits
 
 Understudy measures observable delivery signals only. It does **not** detect
-emotions, truthfulness, confidence, or ability. Scores are heuristics for
-comparing your own sessions on the same setup — not for comparing people.
-These limits are permanent product policy, not a v1 gap.
+emotions, truthfulness, confidence, or ability, and it never will — that is
+permanent product policy, not a roadmap gap. Scores are heuristics for
+comparing your own practice sessions on the same setup; they are not
+comparisons against other people or against any norm. Landmark models behave
+differently across faces, lighting, and cameras — trends are meaningful,
+absolute numbers are not. Word-level timings are estimated within the
+transcribed segment boundaries, so filler timestamps are approximate.
+
+## Development
+
+```bash
+npm ci
+npm run dev          # local dev server
+npm run test:unit    # 95 tests over the pure measurement core
+npm run test:e2e     # Playwright journeys incl. the zero-network guarantee + axe a11y scan
+npm run test:integration  # real Whisper transcription of a synthetic-voice fixture (local only)
+npm run build        # production build (deployed to GitHub Pages by CI)
+```
+
+Stack: Vite + TypeScript (strict), no UI framework. `src/core/` is the pure
+measurement layer; `src/capture/` wraps camera/mic/MediaPipe; `src/speech/`
+runs Whisper in a Web Worker; `src/ui/` is hand-rolled accessible DOM.
+Model assets are vendored via `scripts/fetch-assets.mjs` with pinned sources
+and hashes — see [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Licence
 
-[MIT](LICENSE)
+[MIT](LICENSE). Model weights and runtime licences are listed in
+[THIRD_PARTY.md](THIRD_PARTY.md).
