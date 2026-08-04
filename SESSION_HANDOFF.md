@@ -7,12 +7,12 @@
 order (T5–T10 may run in parallel once T2 and T4 are done). Each task ends
 with a verified test cycle and a pushed commit.
 
-**Next action:** execute Task 1 (scaffold, toolchain, CI).
+**Next action:** execute Task 3 (vendor model assets).
 
 ## Task board
 
-- [ ] T1 Scaffold, toolchain, CI
-- [ ] T2 Core types + config
+- [x] T1 Scaffold, toolchain, CI
+- [x] T2 Core types + config
 - [ ] T3 Vendor model assets
 - [ ] T4 Face math (pose Euler + iris gaze)
 - [ ] T5 Gaze / eye-contact detector
