@@ -23,3 +23,71 @@ body {
   color: var(--color-fg);
   font-family: var(--font-sans);
 }
+
+/* --- Temporary capture dev HUD (T12) -- utilitarian, replaced in T14. --- */
+
+.hud {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.hud-note {
+  color: #d8a13a;
+  font-size: 0.9rem;
+}
+
+.hud-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.hud-controls button {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  background: var(--color-accent);
+  color: var(--color-fg);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hud-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hud-body {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.video-mirror {
+  width: 320px;
+  height: 240px;
+  background: #000;
+  transform: scaleX(-1);
+}
+
+.hud-meters {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.2rem 0.75rem;
+  font-family: ui-monospace, 'Segoe UI Mono', monospace;
+  align-content: start;
+}
+
+.hud-meters dt {
+  color: #9aa3b2;
+}
+
+.hud-meters dd {
+  margin: 0;
+}
+
+.hud-status {
+  font-family: ui-monospace, 'Segoe UI Mono', monospace;
+  color: #9aa3b2;
+}
