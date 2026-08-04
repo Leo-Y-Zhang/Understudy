@@ -47,9 +47,11 @@ than assumed from the plan:
   `onnx/encoder_model_quantized.onnx` and
   `onnx/decoder_model_merged_quantized.onnx` — i.e. the **same** file names
   the v3-era plan assumed, confirmed against v4.2.0 source rather than
-  guessed. This is not just an introspection helper: `models/session.js:349-351`
-  (`constructSessions`, the real model-loading path) uses the identical
-  `DEFAULT_DTYPE_SUFFIX_MAPPING` from `dtypes.js`.
+  guessed. At runtime, `src/models/session.js:55-75` (inside `getSession()`)
+  resolves the dtype-suffix, and `src/models/session.js:145` (`constructSessions`,
+  the real model-loading path) uses the identical `DEFAULT_DTYPE_SUFFIX_MAPPING`
+  from `dtypes.js`. The generation_config is consumed by
+  `src/models/modeling_utils.js:386-387`.
 - **Tokenizer/config sidecars**: `tokenization_utils.js:28-33`
   (`loadTokenizer`, the real runtime tokenizer loader) calls
   `get_tokenizer_files.js`, which requests only `tokenizer.json` plus
@@ -90,11 +92,9 @@ than assumed from the plan:
 ## MediaPipe Face Landmarker model
 
 - **Source URL**: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`
-- **Licence**: Apache-2.0 (MediaPipe Model Maker / MediaPipe Solutions models
-  are distributed under Apache-2.0; see
-  https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE and the
-  model card at
-  https://storage.googleapis.com/mediapipe-tasks/face_landmarker/face_landmarker.md).
+- **Licence**: Apache-2.0 (per the google-ai-edge/mediapipe repository licence
+  (https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE); the
+  hosted model-card page does not state a separate model-bundle licence).
 - **Destination**: `public/mediapipe/face_landmarker.task`
 
 | File | Bytes | SHA-256 |
@@ -106,8 +106,9 @@ than assumed from the plan:
 - **Source repo**: `https://huggingface.co/onnx-community/whisper-tiny.en`
   (`resolve/main/...`), an ONNX export of OpenAI Whisper `tiny.en` republished
   by the `onnx-community` org for use with `@huggingface/transformers`.
-- **Weights licence**: MIT (per the `onnx-community/whisper-tiny.en` model
-  card; OpenAI's original Whisper weights are also MIT-licensed).
+- **Weights licence**: Apache-2.0 (inherited from base model openai/whisper-tiny.en,
+  HF licence tag apache-2.0; the onnx-community conversion repo declares no
+  separate licence).
 - **`@huggingface/transformers@4.2.0` (the loading library)**: Apache-2.0.
 - **Destination**: `public/models/whisper-tiny.en/` — matches
   `env.localModelPath = './models/'` + model id `whisper-tiny.en` expected by
@@ -142,6 +143,6 @@ node scripts/fetch-assets.mjs
 The script copies the MediaPipe WASM runtime from the installed
 `@mediapipe/tasks-vision` package, downloads the two remaining URL-sourced
 assets, and prints the SHA-256 of every file it writes (the table above was
-generated from that output on 2026-08-04, transformers.js commit
+generated from that output on 2026-08-04, model-repo commit
 `2575352d61be1bf7225cf8f8b268a4678025fc58` of `onnx-community/whisper-tiny.en`
 per the `X-Repo-Commit` response header at fetch time).

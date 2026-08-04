@@ -59,7 +59,8 @@ const FACE_LANDMARKER_DEST = path.join(PUBLIC_DIR, 'mediapipe', 'face_landmarker
 //   - onnx/decoder_model_merged_quantized.onnx        (session "decoder_model_merged", q8 -> "_quantized" suffix)
 // See THIRD_PARTY.md for the exact node_modules source lines backing this list.
 const WHISPER_MODEL_ID = 'whisper-tiny.en';
-const WHISPER_BASE_URL = `https://huggingface.co/onnx-community/${WHISPER_MODEL_ID}/resolve/main/`;
+const WHISPER_COMMIT_HASH = '2575352d61be1bf7225cf8f8b268a4678025fc58';
+const WHISPER_BASE_URL = `https://huggingface.co/onnx-community/${WHISPER_MODEL_ID}/resolve/${WHISPER_COMMIT_HASH}/`;
 const WHISPER_FILES = [
   'config.json',
   'generation_config.json',
@@ -98,10 +99,24 @@ async function copyMediapipeWasm() {
       `MediaPipe wasm source not found at ${MEDIAPIPE_WASM_SRC}. Run "npm ci" first (need @mediapipe/tasks-vision installed).`,
     );
   }
+  // Allowlist of expected MediaPipe WASM files
+  const expectedFiles = new Set([
+    'vision_wasm_internal.js',
+    'vision_wasm_internal.wasm',
+    'vision_wasm_module_internal.js',
+    'vision_wasm_module_internal.wasm',
+    'vision_wasm_nosimd_internal.js',
+    'vision_wasm_nosimd_internal.wasm',
+  ]);
   await mkdir(MEDIAPIPE_WASM_DEST, { recursive: true });
   const entries = await readdir(MEDIAPIPE_WASM_SRC, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isFile()) continue;
+    if (!expectedFiles.has(entry.name)) {
+      throw new Error(
+        `Unexpected file in MediaPipe WASM directory: ${entry.name}. Expected only: ${[...expectedFiles].join(', ')}`,
+      );
+    }
     const src = path.join(MEDIAPIPE_WASM_SRC, entry.name);
     const dest = path.join(MEDIAPIPE_WASM_DEST, entry.name);
     await copyFile(src, dest);
