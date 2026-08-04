@@ -198,6 +198,17 @@ a {
   border-radius: var(--radius-sm);
 }
 
+/* App.show() moves focus to each screen's h1 (tabindex="-1") on mount so
+   screen-reader/keyboard users get an announced landing point -- but that
+   same programmatic focus was painting a prominent ring around the
+   headline on every single screen transition, read as a rendering defect
+   rather than the intentional a11y move it is. Suppressed for this
+   non-interactive, never-tab-reachable case only; every real interactive
+   element keeps its :focus-visible ring untouched. */
+h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -593,6 +604,21 @@ a {
   border-color: rgba(242, 236, 220, 0.14);
 }
 
+/* r2 fix: .screen-body is a flex column, whose default cross-axis stretch
+   otherwise gives every direct child (this button included) the screen's
+   full width -- fine for the primary CTAs elsewhere, but a full-bleed red
+   bar dominated this otherwise-bare stage. Centred and bounded, still a
+   large tap target. Scoped to this screen only -- dashboard's own
+   .btn-stop (the wipe confirm) already sits inside a row of .actions and
+   is unaffected. */
+.screen-session .btn-stop {
+  align-self: center;
+  width: 100%;
+  max-width: 320px;
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--text-md);
+}
+
 .session-status {
   color: var(--color-text-muted);
 }
@@ -673,24 +699,16 @@ a {
   font-size: var(--text-sm);
 }
 
-.mock-preview-pulse {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-sage) 0%, transparent 70%);
-  animation: mock-breathe 2.4s ease-in-out infinite;
-}
-
-@keyframes mock-breathe {
-  0%,
-  100% {
-    transform: scale(0.85);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
+/* Shared by the mock preview here and replay's no-video panel below --
+   r2 fix: was a blurred radial-gradient dot that read as a screen defect
+   ("a small green smudge"), not a deliberate mark. A plain stroked glyph,
+   sized to sit quietly above its caption, needs no animation to justify
+   its presence. Colour inherits (currentColor) from each context's own
+   fixed video-well text colour, so it never needs its own colour rule. */
+.camera-off-icon {
+  width: 40px;
+  height: 40px;
+  opacity: 0.75;
 }
 
 .error-panel {
@@ -796,14 +814,6 @@ progress::-moz-progress-bar {
   color: var(--color-video-well-ink);
   font-size: var(--text-sm);
   text-align: center;
-}
-
-.replay-video-placeholder-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-sage) 0%, transparent 70%);
-  opacity: 0.6;
 }
 
 /* -- timeline: legend + canvas -- */

@@ -28,6 +28,44 @@ function preventUnload(ev: BeforeUnloadEvent): void {
   ev.returnValue = '';
 }
 
+// r2 art-direction fix: matches replay.ts's own buildCameraOffIcon exactly
+// (same glyph, same "camera-off-icon" class) -- the old blurred radial-
+// gradient pulse read as a screen defect ("a small green smudge") rather
+// than a deliberate mark, in this mock preview and in replay's own no-video
+// panel alike. No shared module for one small SVG builder used in two
+// screen files; kept as an intentional duplicate rather than a new export.
+function buildCameraOffIcon(): SVGSVGElement {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'camera-off-icon');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.5');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+
+  const body = document.createElementNS(NS, 'rect');
+  body.setAttribute('x', '3');
+  body.setAttribute('y', '6');
+  body.setAttribute('width', '13');
+  body.setAttribute('height', '12');
+  body.setAttribute('rx', '2');
+
+  const flap = document.createElementNS(NS, 'path');
+  flap.setAttribute('d', 'M16 10 L21 7 L21 17 L16 14 Z');
+
+  const slash = document.createElementNS(NS, 'line');
+  slash.setAttribute('x1', '2');
+  slash.setAttribute('y1', '2');
+  slash.setAttribute('x2', '22');
+  slash.setAttribute('y2', '22');
+
+  svg.append(body, flap, slash);
+  return svg;
+}
+
 export interface SessionProps {
   pack: QuestionPack;
   question: QuestionSpec;
@@ -85,12 +123,10 @@ export function sessionScreen(app: App, props: SessionProps): HTMLElement {
   if (flags.mock) {
     const mockPreview = document.createElement('div');
     mockPreview.className = 'mock-preview';
-    const pulse = document.createElement('div');
-    pulse.className = 'mock-preview-pulse';
-    pulse.setAttribute('aria-hidden', 'true');
+    const icon = buildCameraOffIcon();
     const label = document.createElement('p');
     label.textContent = 'Rehearsal mode — no camera in use';
-    mockPreview.append(pulse, label);
+    mockPreview.append(icon, label);
     previewWrap.appendChild(mockPreview);
   } else {
     video = document.createElement('video');

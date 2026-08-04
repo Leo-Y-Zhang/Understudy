@@ -71,10 +71,30 @@ const EVENT_TYPE_LABELS: Record<EventType, string> = {
 };
 
 const SEEK_BACK_S = 0.5;
-const LANE_HEIGHT_PX = 22;
-const LANE_GAP_PX = 4;
-const MARK_INSET_Y_PX = 3;
-const MARK_RADIUS_PX = 4;
+// r2 art-direction fix: the tracks were reading as six giant empty progress
+// bars, dwarfing the marks they're meant to carry. Lanes are shorter, their
+// background is a low-contrast rail rather than a filled pill (lower alpha,
+// tighter corner radius), and marks are inset less so they fill more of
+// that shorter lane -- the events are the stars, not the tracks.
+const LANE_HEIGHT_PX = 18;
+const LANE_GAP_PX = 5;
+const MARK_INSET_Y_PX = 2;
+const MARK_RADIUS_PX = 5;
+const LANE_BG_RADIUS_PX = 3;
+const LANE_BG_ALPHA = 0.42;
+// Small muted lane labels drawn inside the canvas's left edge, a drawing-
+// only addition (layoutTimeline() in timeline.ts is untouched -- this just
+// lays the same proportional marks out over a narrower track and offsets
+// them past the label gutter when drawing).
+const LANE_LABEL_GUTTER_PX = 44;
+const LANE_SHORT_LABELS: Record<EventType, string> = {
+  'gaze-break': 'GAZE',
+  'blink-burst': 'BLINK',
+  expression: 'EXPR',
+  fidget: 'FIDGET',
+  pause: 'PAUSE',
+  filler: 'FILLER',
+};
 const CANVAS_HEIGHT_PX =
   TIMELINE_LANE_ORDER.length * LANE_HEIGHT_PX + (TIMELINE_LANE_ORDER.length - 1) * LANE_GAP_PX;
 
@@ -107,9 +127,7 @@ function buildVideoPanel(
   if (!replayBlob) {
     const placeholder = document.createElement('div');
     placeholder.className = 'replay-video-placeholder';
-    const icon = document.createElement('div');
-    icon.className = 'replay-video-placeholder-icon';
-    icon.setAttribute('aria-hidden', 'true');
+    const icon = buildCameraOffIcon();
     const text = document.createElement('p');
     text.textContent = replayMissing
       ? 'Your video is no longer available'
@@ -133,6 +151,42 @@ function buildVideoPanel(
   app.onExit(() => URL.revokeObjectURL(objectUrl));
 
   return video;
+}
+
+// r2 art-direction fix: the old placeholder icon was a blurred radial-
+// gradient dot that read as a screen defect ("a small green smudge"), not a
+// deliberate mark. A plain stroked camera-off glyph reads cleanly at small
+// size and needs no animation to justify its presence.
+function buildCameraOffIcon(): SVGSVGElement {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'camera-off-icon');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.5');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+
+  const body = document.createElementNS(NS, 'rect');
+  body.setAttribute('x', '3');
+  body.setAttribute('y', '6');
+  body.setAttribute('width', '13');
+  body.setAttribute('height', '12');
+  body.setAttribute('rx', '2');
+
+  const flap = document.createElementNS(NS, 'path');
+  flap.setAttribute('d', 'M16 10 L21 7 L21 17 L16 14 Z');
+
+  const slash = document.createElementNS(NS, 'line');
+  slash.setAttribute('x1', '2');
+  slash.setAttribute('y1', '2');
+  slash.setAttribute('x2', '22');
+  slash.setAttribute('y2', '22');
+
+  svg.append(body, flap, slash);
+  return svg;
 }
 
 // --- Timeline (canvas + legend) ----------------------------------------
@@ -194,28 +248,45 @@ function buildTimeline(
 
     const styles = getComputedStyle(canvas);
     const laneBg = styles.getPropertyValue('--color-line').trim() || '#2b3226';
+    const labelColor = styles.getPropertyValue('--color-text-muted').trim() || '#9aa08c';
+    const trackWidthCss = Math.max(1, widthCss - LANE_LABEL_GUTTER_PX);
 
+    ctx.font = '9px ui-monospace, Consolas, monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = labelColor;
     for (let lane = 0; lane < TIMELINE_LANE_ORDER.length; lane++) {
       const y = lane * (LANE_HEIGHT_PX + LANE_GAP_PX);
-      fillRoundedRect(ctx, 0, y, widthCss, LANE_HEIGHT_PX, 6, laneBg, 1);
+      fillRoundedRect(ctx, LANE_LABEL_GUTTER_PX, y, trackWidthCss, LANE_HEIGHT_PX, LANE_BG_RADIUS_PX, laneBg, LANE_BG_ALPHA);
+      ctx.fillStyle = labelColor;
+      ctx.fillText(LANE_SHORT_LABELS[TIMELINE_LANE_ORDER[lane]!], 0, y + LANE_HEIGHT_PX / 2);
     }
 
-    const marks = layoutTimeline(events, durationS, widthCss);
+    const marks = layoutTimeline(events, durationS, trackWidthCss);
     for (const mark of marks) {
       const y = mark.lane * (LANE_HEIGHT_PX + LANE_GAP_PX) + MARK_INSET_Y_PX;
       const h = LANE_HEIGHT_PX - MARK_INSET_Y_PX * 2;
       const color = styles.getPropertyValue(`--lane-${mark.event.type}`).trim() || '#8fb093';
-      fillRoundedRect(ctx, mark.x, y, mark.w, h, MARK_RADIUS_PX, color, severityOpacity(mark.event.severity));
+      fillRoundedRect(
+        ctx,
+        mark.x + LANE_LABEL_GUTTER_PX,
+        y,
+        mark.w,
+        h,
+        MARK_RADIUS_PX,
+        color,
+        severityOpacity(mark.event.severity)
+      );
     }
 
     if (video && durationS > 0) {
       const fraction = clamp(video.currentTime / durationS, 0, 1);
       const playheadColor = styles.getPropertyValue('--color-brass').trim() || '#d9b54a';
+      const playheadX = LANE_LABEL_GUTTER_PX + fraction * trackWidthCss;
       ctx.strokeStyle = playheadColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(fraction * widthCss, 0);
-      ctx.lineTo(fraction * widthCss, CANVAS_HEIGHT_PX);
+      ctx.moveTo(playheadX, 0);
+      ctx.lineTo(playheadX, CANVAS_HEIGHT_PX);
       ctx.stroke();
     }
   };
@@ -235,7 +306,8 @@ function buildTimeline(
 
     canvas.addEventListener('click', (ev) => {
       const rect = canvas.getBoundingClientRect();
-      const fraction = clamp((ev.clientX - rect.left) / rect.width, 0, 1);
+      const trackWidth = Math.max(1, rect.width - LANE_LABEL_GUTTER_PX);
+      const fraction = clamp((ev.clientX - rect.left - LANE_LABEL_GUTTER_PX) / trackWidth, 0, 1);
       video.currentTime = fraction * durationS;
     });
   }
