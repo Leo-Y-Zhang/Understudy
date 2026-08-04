@@ -36,4 +36,13 @@ describe('UnderstudyConfig', () => {
     expect(resolved.gazeXOn).toBe(DEFAULT_CONFIG.gazeXOn);
     expect(resolved.blinkOn).toBe(DEFAULT_CONFIG.blinkOn);
   });
+
+  it('DEFAULT_CONFIG sentinel literals match expected values', () => {
+    expect(DEFAULT_CONFIG.blinkOn).toBe(0.5);
+    expect(DEFAULT_CONFIG.pauseMinS).toBe(1.5);
+    expect(DEFAULT_CONFIG.exprK).toBe(4);
+    expect(DEFAULT_CONFIG.fidgetGood).toBe(0.05);
+    expect(DEFAULT_CONFIG.paceIdealLo).toBe(110);
+    expect(DEFAULT_CONFIG.wEyeContact).toBe(0.22);
+  });
 });
