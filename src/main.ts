@@ -6,12 +6,16 @@ import { questionScreen } from './ui/screens/question';
 import { sessionScreen } from './ui/screens/session';
 import { processingScreen } from './ui/screens/processing';
 import { replayScreen } from './ui/screens/replay';
+import { dashboardScreen } from './ui/screens/dashboard';
 import generalAdmissionsPack from './packs/general-admissions.json';
 
 // Session flow: consent -> home -> question -> session -> processing ->
-// replay (annotated timeline + scorecard). `?mock=1` swaps every capture/transcription
-// dependency for deterministic in-memory stand-ins so the whole flow can be
-// exercised without a camera, a microphone, or the Whisper model; `&fast=1`
+// replay (annotated timeline + scorecard, auto-saved to IndexedDB). Home's
+// "Progress" action reaches dashboard (trend + history + export/wipe)
+// independently of that flow; dashboard opens a saved session back into
+// replay, readonly. `?mock=1` swaps every capture/transcription dependency
+// for deterministic in-memory stand-ins so the whole flow can be exercised
+// without a camera, a microphone, or the Whisper model; `&fast=1`
 // additionally speeds up the mock face tracker's virtual clock. Consent is
 // always the first screen on a mock run (and never persists), and the first
 // screen on any run that hasn't accepted it yet before.
@@ -38,6 +42,7 @@ function main(): void {
   app.register('session', sessionScreen);
   app.register('processing', processingScreen);
   app.register('replay', replayScreen);
+  app.register('dashboard', dashboardScreen);
 
   const canSkipConsent = !flags.mock && hasConsented();
   if (canSkipConsent) {

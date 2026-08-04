@@ -16,6 +16,7 @@ import { App, QuestionPack, QuestionSpec, RunFlags, screenSection } from '../app
 import { clamp, formatElapsed, formatPercent, formatScore } from '../format';
 import { layoutTimeline, TIMELINE_LANE_ORDER } from '../timeline';
 import { drawQuestion } from './home';
+import { openDb, UnderstudyDb, SessionRecord } from '../../data/db';
 import type { DeliveryEvent, EventType, SessionAnalysis, SubScores } from '../../core/types';
 
 export interface ReplayProps {
@@ -27,9 +28,20 @@ export interface ReplayProps {
   analysis: SessionAnalysis;
   replayBlob: Blob | null;
   flags: RunFlags;
+  /**
+   * True when this replay was opened from the dashboard with an
+   * already-saved record: the video (if any) came from `getReplay()`, not a
+   * fresh recording, so there is nothing to auto-save and no "keep video"
+   * toggle. Undefined/false (Processing's own handoff never sets this) means
+   * a fresh session, which auto-saves itself on mount -- see buildSavePanel.
+   */
+  readonly?: boolean;
 }
 
-const SUB_SCORE_LABELS: Array<[key: keyof SubScores, label: string]> = [
+/** Exported so the dashboard's "latest vs. best" rows use the exact same
+ *  six keys, order and wording as the scorecard above -- one source of
+ *  truth for what a sub-score is called. */
+export const SUB_SCORE_LABELS: Array<[key: keyof SubScores, label: string]> = [
   ['eyeContact', 'Eye contact'],
   ['blinkSteadiness', 'Blink steadiness'],
   ['expressionControl', 'Expression control'],
@@ -56,7 +68,7 @@ const CANVAS_HEIGHT_PX =
   TIMELINE_LANE_ORDER.length * LANE_HEIGHT_PX + (TIMELINE_LANE_ORDER.length - 1) * LANE_GAP_PX;
 
 export function replayScreen(app: App, props: ReplayProps): HTMLElement {
-  const { pack, analysis, durationS, replayBlob, flags } = props;
+  const { pack, analysis, durationS, replayBlob, flags, readonly } = props;
   const { section, body } = screenSection('replay', 'Your replay');
   section.classList.add('screen-replay');
 
@@ -64,7 +76,8 @@ export function replayScreen(app: App, props: ReplayProps): HTMLElement {
   buildTimeline(body, analysis.events, durationS, video);
   buildEventList(body, analysis.events, video);
   buildScorecard(body, props);
-  buildActions(app, body, pack, flags);
+  if (!readonly) buildSavePanel(body, props);
+  buildActions(app, body, pack, flags, readonly);
 
   return section;
 }
@@ -407,9 +420,104 @@ function formatComposure(score: number): string {
   return safe.toFixed(1);
 }
 
+// --- Save panel: auto-save on mount + opt-in "keep video" toggle ----------
+//
+// Only built for a fresh session straight off Processing (readonly replays
+// opened from the dashboard skip this entirely -- their record already
+// exists, and there is nothing here left to save). Best-effort throughout:
+// a storage failure (private browsing, quota, an unsupported browser) shows
+// a quiet failure line instead of the confirmation, never throws, and never
+// blocks the rest of the replay screen from working.
+
+function buildSavePanel(body: HTMLElement, props: ReplayProps): void {
+  const { question, packId, startedAt, durationS, analysis, replayBlob } = props;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'save-panel';
+
+  const status = document.createElement('p');
+  status.className = 'save-status';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  status.textContent = 'Saving to this browser…';
+  wrap.appendChild(status);
+
+  const rec: SessionRecord = {
+    id: crypto.randomUUID(),
+    startedAt,
+    packId,
+    questionId: question.id,
+    questionText: question.text,
+    durationS,
+    stats: analysis.stats,
+    sub: analysis.sub,
+    composure: analysis.composure,
+    events: analysis.events,
+    hasReplay: false,
+  };
+
+  void (async () => {
+    try {
+      const db = await openDb();
+      await db.saveSession(rec);
+      status.textContent = 'Saved to this browser';
+      if (replayBlob) buildKeepVideoToggle(wrap, db, rec, replayBlob);
+    } catch (err) {
+      console.warn('[replay] auto-save failed', err);
+      status.textContent = 'Could not save to this browser (storage may be unavailable).';
+    }
+  })();
+
+  body.appendChild(wrap);
+}
+
+function buildKeepVideoToggle(wrap: HTMLElement, db: UnderstudyDb, rec: SessionRecord, blob: Blob): void {
+  const label = document.createElement('label');
+  label.className = 'save-toggle';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = false;
+  const labelText = document.createElement('span');
+  labelText.textContent = 'Keep video with this session';
+  label.append(checkbox, labelText);
+  wrap.appendChild(label);
+
+  const note = document.createElement('p');
+  note.className = 'save-toggle-note';
+  note.setAttribute('role', 'status');
+  note.setAttribute('aria-live', 'polite');
+  wrap.appendChild(note);
+
+  checkbox.addEventListener('change', () => {
+    const wantKeep = checkbox.checked;
+    void (async () => {
+      checkbox.disabled = true;
+      try {
+        if (wantKeep) {
+          await db.saveReplay(rec.id, blob);
+          rec.hasReplay = true;
+          await db.saveSession(rec);
+          note.textContent = 'Video saved with this session, on this device only.';
+        } else {
+          await db.deleteReplay(rec.id);
+          rec.hasReplay = false;
+          await db.saveSession(rec);
+          note.textContent = 'Video removed — the scorecard is still saved.';
+        }
+      } catch (err) {
+        console.warn('[replay] save toggle failed', err);
+        checkbox.checked = !wantKeep;
+        note.textContent = 'Could not update — try again.';
+      } finally {
+        checkbox.disabled = false;
+      }
+    })();
+  });
+}
+
 // --- Actions ---------------------------------------------------------------
 
-function buildActions(app: App, body: HTMLElement, pack: QuestionPack, flags: RunFlags): void {
+function buildActions(app: App, body: HTMLElement, pack: QuestionPack, flags: RunFlags, readonly?: boolean): void {
   const actions = document.createElement('div');
   actions.className = 'actions';
 
@@ -426,7 +534,15 @@ function buildActions(app: App, body: HTMLElement, pack: QuestionPack, flags: Ru
   done.type = 'button';
   done.className = 'btn btn-ghost';
   done.textContent = 'Done';
-  done.addEventListener('click', () => app.show('home', { pack, flags }));
+  done.addEventListener('click', () => {
+    // A replay reached from the dashboard should hand back to the
+    // dashboard, not Home -- Home has no notion of "where you came from".
+    if (readonly) {
+      app.show('dashboard', { pack, flags });
+    } else {
+      app.show('home', { pack, flags });
+    }
+  });
 
   actions.append(again, done);
   body.appendChild(actions);

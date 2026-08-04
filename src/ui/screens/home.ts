@@ -2,8 +2,14 @@
 // "Rehearse" call to action that draws a question and moves on.
 
 import { App, QuestionPack, QuestionSpec, RunFlags, screenSection } from '../app';
+import { openDb } from '../../data/db';
 
-const DRAWN_KEY = 'understudy.drawn.v1';
+// Exported so the dashboard's wipe flow clears exactly this key (rather than
+// a second, hand-copied literal) when it resets local state to a fresh
+// install. `understudy.consent.v1` (consent.ts) has no analogous export --
+// consent.ts isn't part of this task's file list -- so the dashboard keeps
+// that one literal, called out there with the same cross-reference.
+export const DRAWN_KEY = 'understudy.drawn.v1';
 
 export interface HomeProps {
   pack: QuestionPack;
@@ -68,6 +74,9 @@ export function homeScreen(app: App, props: HomeProps): HTMLElement {
   packCard.append(packTitle, packMeta);
   body.appendChild(packCard);
 
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+
   const rehearseBtn = document.createElement('button');
   rehearseBtn.type = 'button';
   rehearseBtn.className = 'btn btn-primary btn-large';
@@ -76,7 +85,15 @@ export function homeScreen(app: App, props: HomeProps): HTMLElement {
     const question = drawQuestion(pack);
     app.show('question', { pack, question, flags });
   });
-  body.appendChild(rehearseBtn);
+
+  const progressBtn = document.createElement('button');
+  progressBtn.type = 'button';
+  progressBtn.className = 'btn btn-ghost';
+  progressBtn.textContent = 'Progress';
+  progressBtn.addEventListener('click', () => app.show('dashboard', { pack, flags }));
+
+  actions.append(rehearseBtn, progressBtn);
+  body.appendChild(actions);
 
   const history = document.createElement('div');
   history.className = 'history-placeholder';
@@ -84,6 +101,25 @@ export function homeScreen(app: App, props: HomeProps): HTMLElement {
   historyText.textContent = 'Your rehearsals will appear here once you’ve done one.';
   history.appendChild(historyText);
   body.appendChild(history);
+
+  // Fill in the placeholder above with a one-line summary once any saved
+  // sessions load -- async, so this runs after homeScreen already returned
+  // its section; a failure here (storage unavailable) just leaves the
+  // original placeholder text in place rather than breaking the screen.
+  void (async () => {
+    try {
+      const db = await openDb();
+      const sessions = await db.listSessions();
+      if (sessions.length === 0) return;
+      const latest = sessions[0]!; // listSessions() is newest-first
+      history.classList.add('history-summary');
+      historyText.textContent =
+        `${sessions.length} rehearsal${sessions.length === 1 ? '' : 's'} saved on this device — ` +
+        `latest composure ${formatComposureShort(latest.composure)}.`;
+    } catch (err) {
+      console.warn('[home] could not load session summary', err);
+    }
+  })();
 
   const smallPrint = document.createElement('button');
   smallPrint.type = 'button';
@@ -95,4 +131,13 @@ export function homeScreen(app: App, props: HomeProps): HTMLElement {
   body.appendChild(smallPrint);
 
   return section;
+}
+
+/** One-decimal composure, matching replay.ts's own local `formatComposure`
+ *  -- kept as a small duplicate rather than a shared export since `format.ts`
+ *  isn't part of this task's file list and the two call sites' rounding
+ *  needs happen to already coincide. */
+function formatComposureShort(score: number): string {
+  const safe = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
+  return safe.toFixed(1);
 }
