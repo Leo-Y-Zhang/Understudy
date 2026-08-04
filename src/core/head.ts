@@ -1,12 +1,20 @@
 import { FaceSample, DeliveryEvent } from './types';
 import { UnderstudyConfig } from './config';
 
+// One frame interval at the nominal 30fps sample rate, used as the adjacency
+// tolerance when merging fidgety regions (see step 3 below).
+const FRAME_INTERVAL_S = 1 / 30;
+
 export function headSteadiness(
   frames: FaceSample[],
   cfg: UnderstudyConfig
 ): { fidgetIndex: number; events: DeliveryEvent[] } {
-  // Calculate per-frame angular speeds
-  const speeds: number[] = [];
+  // Calculate per-frame angular speeds, carrying the timestamp of the LATER frame in
+  // each pair alongside the speed value. Carrying timestamps (rather than relying on
+  // speeds[]<->frames[] index arithmetic downstream) keeps windowing and event-boundary
+  // math correct even when present=false frames are skipped, which compacts this array
+  // relative to the frames array.
+  const speeds: Array<{ t: number; v: number }> = [];
 
   for (let i = 1; i < frames.length; i++) {
     const curr = frames[i]!;
@@ -27,13 +35,13 @@ export function headSteadiness(
     const droll = curr.roll - prev.roll;
 
     const angularSpeed = Math.sqrt(dyaw * dyaw + dpitch * dpitch + droll * droll) / dt;
-    speeds.push(angularSpeed);
+    speeds.push({ t: curr.t, v: angularSpeed });
   }
 
   // Calculate fidgetIndex (RMS of all angular speeds)
   let fidgetIndex = 0;
   if (speeds.length >= 1) {
-    const sumOfSquares = speeds.reduce((sum, s) => sum + s * s, 0);
+    const sumOfSquares = speeds.reduce((sum, s) => sum + s.v * s.v, 0);
     fidgetIndex = Math.sqrt(sumOfSquares / speeds.length);
   }
 
@@ -44,77 +52,111 @@ export function headSteadiness(
     return { fidgetIndex, events };
   }
 
-  // Calculate session median speed
-  const sortedSpeeds = [...speeds].sort((a, b) => a - b);
-  const medianSpeed = sortedSpeeds[Math.floor(sortedSpeeds.length / 2)]!;
+  // Calculate session median speed. For an even-length array there is no single middle
+  // element, so use the average of the two middle values (standard median definition) -
+  // taking just the upper-middle element biases the threshold on even-length sessions.
+  const sortedSpeeds = speeds.map(s => s.v).sort((a, b) => a - b);
+  const mid = Math.floor(sortedSpeeds.length / 2);
+  const medianSpeed =
+    sortedSpeeds.length % 2 === 0
+      ? (sortedSpeeds[mid - 1]! + sortedSpeeds[mid]!) / 2
+      : sortedSpeeds[mid]!;
 
   // Fidgety threshold: max(2 * sessionMedian, fidgetGood * 2)
   const fidgetyThreshold = Math.max(2 * medianSpeed, cfg.fidgetGood * 2);
 
-  // Slide window over the frame array
-  // A window of headWindowS seconds = headWindowS * 30 speeds (at 30fps)
-  // Which spans headWindowS * 30 + 1 frames
-  const windowSpeedsCount = Math.round(cfg.headWindowS * 30);
-  const windowFrameCount = windowSpeedsCount + 1;
+  // Slide a headWindowS-second window over the speed samples, keyed by TIMESTAMP (not
+  // array index or frame index), so that present=false gaps elsewhere in the session
+  // never desync this scan from the true timeline. This pass only finds fidgety
+  // REGIONS (merged windows); it does not decide final event boundaries - see the
+  // trimming pass below, which fixes the "event balloons by a window-width" bug.
+  //
+  // Two-pointer sweep: as the window start (i) advances, the window's timestamp only
+  // increases, so the window end pointer only ever moves forward too.
+  const fidgetyWindows: Array<{ t0: number; t1: number }> = [];
+  let windowEndIdx = 0;
 
-  const fidgetyWindows: Array<{ startIdx: number; endIdx: number }> = [];
+  for (let i = 0; i < speeds.length; i++) {
+    const windowStartT = speeds[i]!.t;
+    const windowEndT = windowStartT + cfg.headWindowS;
 
-  for (let i = 0; i <= frames.length - windowFrameCount; i++) {
-    const windowStart = i;
-    const windowEnd = i + windowFrameCount - 1;
-
-    // Calculate RMS of speeds in this window
-    // Speeds array has length frames.length - 1, where speeds[i] is the speed from frames[i] to frames[i+1]
-    // A window from frame i to frame i+W-1 (W frames) corresponds to speeds i to i+W-2 (W-1 speeds)
-    const speedsInWindow: number[] = [];
-    for (let j = windowStart; j < windowEnd; j++) {
-      if (j < speeds.length) {
-        speedsInWindow.push(speeds[j]!);
-      }
+    if (windowEndIdx < i) {
+      windowEndIdx = i;
+    }
+    while (windowEndIdx + 1 < speeds.length && speeds[windowEndIdx + 1]!.t <= windowEndT) {
+      windowEndIdx++;
     }
 
-    if (speedsInWindow.length > 0) {
-      const sumOfSquares = speedsInWindow.reduce((sum, s) => sum + s * s, 0);
-      const windowRms = Math.sqrt(sumOfSquares / speedsInWindow.length);
+    let sumOfSquares = 0;
+    for (let k = i; k <= windowEndIdx; k++) {
+      sumOfSquares += speeds[k]!.v * speeds[k]!.v;
+    }
+    const windowRms = Math.sqrt(sumOfSquares / (windowEndIdx - i + 1));
 
-      if (windowRms > fidgetyThreshold) {
-        fidgetyWindows.push({ startIdx: windowStart, endIdx: windowEnd });
+    if (windowRms > fidgetyThreshold) {
+      fidgetyWindows.push({ t0: speeds[i]!.t, t1: speeds[windowEndIdx]!.t });
+    }
+  }
+
+  // Merge adjacent OR overlapping fidgety regions. "Adjacent" means the next region
+  // starts within one frame interval of where the current one ends.
+  const mergedRegions: Array<{ t0: number; t1: number }> = [];
+  for (const region of fidgetyWindows) {
+    if (mergedRegions.length === 0) {
+      mergedRegions.push({ ...region });
+    } else {
+      const last = mergedRegions[mergedRegions.length - 1]!;
+      if (region.t0 <= last.t1 + FRAME_INTERVAL_S) {
+        last.t1 = Math.max(last.t1, region.t1);
+      } else {
+        mergedRegions.push({ ...region });
       }
     }
   }
 
-  // Merge adjacent/overlapping fidgety windows
-  if (fidgetyWindows.length > 0) {
-    const merged: Array<{ startIdx: number; endIdx: number }> = [];
+  // Trim each merged region down to the FIRST and LAST individual speed sample inside
+  // it whose speed exceeds the same fidgetyThreshold. This is what stops an event from
+  // ballooning by roughly a window-width on each side: the window scan above finds
+  // where shaking-adjacent windows are, but the final reported span should cover only
+  // the samples that actually shook. Regions with no qualifying sample are dropped
+  // (in practice unreachable, since RMS > threshold implies some sample > threshold,
+  // but guarded defensively).
+  //
+  // Regions and speeds are both time-ordered, so a single running pointer suffices -
+  // no need to rescan from the start of speeds for each region.
+  let scanIdx = 0;
+  for (const region of mergedRegions) {
+    while (scanIdx < speeds.length && speeds[scanIdx]!.t < region.t0) {
+      scanIdx++;
+    }
 
-    for (const window of fidgetyWindows) {
-      if (merged.length === 0) {
-        merged.push(window);
-      } else {
-        const last = merged[merged.length - 1]!;
-        // Merge if overlapping (window starts before or at last window end)
-        if (window.startIdx <= last.endIdx) {
-          last.endIdx = Math.max(last.endIdx, window.endIdx);
-        } else {
-          merged.push(window);
+    let trimmedT0: number | undefined;
+    let trimmedT1: number | undefined;
+    let k = scanIdx;
+    while (k < speeds.length && speeds[k]!.t <= region.t1) {
+      const sample = speeds[k]!;
+      if (sample.v > fidgetyThreshold) {
+        if (trimmedT0 === undefined) {
+          trimmedT0 = sample.t;
         }
+        trimmedT1 = sample.t;
       }
+      k++;
     }
 
-    // Convert merged windows to events
-    for (const window of merged) {
-      const t0 = frames[window.startIdx]!.t;
-      const t1 = frames[window.endIdx]!.t;
-      const duration = t1 - t0;
-
-      events.push({
-        t0,
-        t1,
-        type: 'fidget',
-        severity: 2,
-        detail: `restless ${duration.toFixed(1)}s`,
-      });
+    if (trimmedT0 === undefined || trimmedT1 === undefined) {
+      continue;
     }
+
+    const duration = trimmedT1 - trimmedT0;
+
+    events.push({
+      t0: trimmedT0,
+      t1: trimmedT1,
+      type: 'fidget',
+      severity: 2,
+      detail: `restless ${duration.toFixed(1)}s`,
+    });
   }
 
   return { fidgetIndex, events };

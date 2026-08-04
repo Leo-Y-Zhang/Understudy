@@ -34,20 +34,20 @@ describe('headSteadiness', () => {
     expect(result.events.length).toBe(0);
   });
 
-  // Test 3: Still 4s + violent shake 2s (rapid alternating yaw) + still 4s
-  // Expected: one event covering the shake region, fidgetIndex well above 0.05
-  it('detects a violent shake event in the middle of stable motion', () => {
+  // Test 3 (authoritative spec): Still 4s + shake 2s (yaw alternates 0.05/0 each
+  // frame -> per-frame delta 0.05 rad -> speed 1.5 rad/s) + still 4s.
+  // Expected: exactly one event, TRIMMED to the actual shaking samples (t0~4, t1~6),
+  // not ballooned by an extra window-width on each side.
+  it('detects a shake event trimmed to the shaking region, not ballooned by the window width', () => {
     const frames = mkFrames([[4, true], [2, true], [4, true]]);
 
-    // Modify frames: at the 4s mark, start rapidly alternating yaw ±0.3 rad every frame
-    // This creates very high angular speeds (~18 rad/s during the shake)
     const startShakeFrame = 120; // 4s * 30fps = 120
     const shakeEndFrame = 180;   // 6s * 30fps = 180
 
     const modifiedFrames = frames.map((f, i) => {
       if (i >= startShakeFrame && i < shakeEndFrame) {
-        // Alternate yaw every frame during shake period
-        const yaw = (i - startShakeFrame) % 2 === 0 ? 0.3 : -0.3;
+        // Alternate yaw 0.05/0 every frame: per-frame delta 0.05 rad -> speed 1.5 rad/s
+        const yaw = (i - startShakeFrame) % 2 === 0 ? 0.05 : 0;
         return { ...f, yaw };
       }
       return f;
@@ -55,7 +55,7 @@ describe('headSteadiness', () => {
 
     const result = headSteadiness(modifiedFrames, DEFAULT_CONFIG);
 
-    // fidgetIndex should be well above 0.05 due to the violent shake
+    // fidgetIndex should be well above 0.05 due to the shake
     expect(result.fidgetIndex).toBeGreaterThan(0.05);
 
     // Should have exactly one event
@@ -65,13 +65,86 @@ describe('headSteadiness', () => {
     expect(event.type).toBe('fidget');
     expect(event.severity).toBe(2);
 
-    // Event should encompass the shake region
-    // With sliding windows, the event may start slightly before and end slightly after
-    expect(event.t0).toBeLessThanOrEqual(4.0);
-    expect(event.t1).toBeGreaterThanOrEqual(6.0);
+    // Event boundaries must be trimmed to the actual shaking samples, two-sided:
+    // t0 close to 4s (not ~2s from window-width ballooning), t1 close to 6s (not ~8s).
+    expect(event.t0).toBeGreaterThanOrEqual(3.5);
+    expect(event.t0).toBeLessThanOrEqual(4.5);
+    expect(event.t1).toBeGreaterThanOrEqual(5.5);
+    expect(event.t1).toBeLessThanOrEqual(7.0);
 
     // Check detail format
     expect(event.detail).toMatch(/^restless \d+\.\d+s$/);
+  });
+
+  // Regression: an unrelated present=false occlusion earlier in the session must not
+  // shift the detected boundaries of a later shake event. Previously the code mapped
+  // window/frame indices directly onto the compacted (present-filtered) speeds array,
+  // so an earlier occlusion desynced all later index-based lookups.
+  it('does not shift a later shake event when an earlier unrelated occlusion is present', () => {
+    const buildSession = (): FaceSample[] => {
+      const frames = mkFrames([[6, true], [2, true], [4, true]]);
+      const shakeStartFrame = 180; // 6s * 30fps
+      const shakeEndFrame = 240;   // 8s * 30fps
+      return frames.map((f, i) => {
+        if (i >= shakeStartFrame && i < shakeEndFrame) {
+          const yaw = (i - shakeStartFrame) % 2 === 0 ? 0.05 : 0;
+          return { ...f, yaw };
+        }
+        return f;
+      });
+    };
+
+    const sessionA = buildSession();
+
+    // Session B: identical, but frames t=[1,2) are marked not present (a 1s occlusion
+    // with garbage yaw that must be ignored entirely, well before the shake at t=6..8).
+    const occlusionStart = Math.round(1 * 30);
+    const occlusionEnd = Math.round(2 * 30);
+    const sessionB = buildSession().map((f, i) => {
+      if (i >= occlusionStart && i < occlusionEnd) {
+        return { ...f, present: false, yaw: 10.0 };
+      }
+      return f;
+    });
+
+    const resultA = headSteadiness(sessionA, DEFAULT_CONFIG);
+    const resultB = headSteadiness(sessionB, DEFAULT_CONFIG);
+
+    expect(resultA.events.length).toBe(1);
+    expect(resultB.events.length).toBe(1);
+
+    const eventA = resultA.events[0]!;
+    const eventB = resultB.events[0]!;
+
+    expect(Math.abs(eventA.t0 - eventB.t0)).toBeLessThan(0.2);
+    expect(Math.abs(eventA.t1 - eventB.t1)).toBeLessThan(0.2);
+  });
+
+  // Adjacency merge: two shakes only 0.1s apart must be reported as a single event,
+  // not two separate ones.
+  it('merges two shakes 0.1s apart into a single event', () => {
+    const frames = mkFrames([[4, true], [2, true], [0.1, true], [2, true], [4, true]]);
+
+    const shake1Start = 120; // 4s * 30fps
+    const shake1End = 180;   // 6s * 30fps
+    const shake2Start = 183; // 6.1s * 30fps
+    const shake2End = 243;   // 8.1s * 30fps
+
+    const modifiedFrames = frames.map((f, i) => {
+      if (i >= shake1Start && i < shake1End) {
+        const yaw = (i - shake1Start) % 2 === 0 ? 0.05 : 0;
+        return { ...f, yaw };
+      }
+      if (i >= shake2Start && i < shake2End) {
+        const yaw = (i - shake2Start) % 2 === 0 ? 0.05 : 0;
+        return { ...f, yaw };
+      }
+      return f;
+    });
+
+    const result = headSteadiness(modifiedFrames, DEFAULT_CONFIG);
+
+    expect(result.events.length).toBe(1);
   });
 
   // Test 4a: Empty input
