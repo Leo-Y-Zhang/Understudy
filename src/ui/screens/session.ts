@@ -199,6 +199,11 @@ export function sessionScreen(app: App, props: SessionProps): HTMLElement {
     }
     tracker?.stop();
     tracker = null;
+    try {
+      audioMeter?.stopAndGetSeries();
+    } catch {
+      // teardown is best-effort
+    }
     audioMeter = null;
     recorder = null;
     camera?.stop();
