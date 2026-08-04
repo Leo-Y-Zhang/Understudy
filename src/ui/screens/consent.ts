@@ -46,8 +46,11 @@ export function consentScreen(app: App, props: ConsentProps): HTMLElement {
 
   const wordmark = document.createElement('p');
   wordmark.className = 'wordmark wordmark-small';
-  wordmark.textContent = 'Understudy';
   wordmark.setAttribute('aria-hidden', 'true');
+  const wordmarkU = document.createElement('span');
+  wordmarkU.className = 'wordmark-mark';
+  wordmarkU.textContent = 'U';
+  wordmark.append(wordmarkU, document.createTextNode('nderstudy'));
   section.insertBefore(wordmark, body);
 
   const intro = document.createElement('p');
@@ -75,7 +78,7 @@ export function consentScreen(app: App, props: ConsentProps): HTMLElement {
       'device. There’s no backend, no account, and no upload path for any of it. Understudy runs ' +
       'entirely inside this browser tab.';
     return p;
-  }));
+  }, 'consent-block--feature'));
 
   body.appendChild(buildSection('See for yourself', () => {
     const p = document.createElement('p');
@@ -143,9 +146,9 @@ export function consentScreen(app: App, props: ConsentProps): HTMLElement {
   return section;
 }
 
-function buildSection(title: string, buildBody: () => HTMLElement): HTMLElement {
+function buildSection(title: string, buildBody: () => HTMLElement, variantClass?: string): HTMLElement {
   const wrap = document.createElement('div');
-  wrap.className = 'consent-block';
+  wrap.className = variantClass ? `consent-block ${variantClass}` : 'consent-block';
   const h2 = document.createElement('h2');
   h2.textContent = title;
   wrap.append(h2, buildBody());

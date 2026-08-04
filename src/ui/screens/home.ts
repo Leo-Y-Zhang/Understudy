@@ -58,11 +58,27 @@ export function homeScreen(app: App, props: HomeProps): HTMLElement {
   const { pack, flags } = props;
   const { section, h1, body } = screenSection('home', 'Understudy');
   h1.className = 'wordmark';
+  // "Understudy" set as a wordmark span (the house spotlight-dot mark) plus
+  // a trailing text node -- same accessible name ("Understudy"), just built
+  // in two DOM nodes so the first "u" can carry the dot above it.
+  h1.textContent = '';
+  const wordmarkU = document.createElement('span');
+  wordmarkU.className = 'wordmark-mark';
+  wordmarkU.textContent = 'U';
+  h1.append(wordmarkU, document.createTextNode('nderstudy'));
+
+  // Hero block: wordmark + strapline centred like a title card, the one
+  // moment on this screen allowed to be purely decorative before the pack
+  // card and its single primary action take over.
+  const hero = document.createElement('div');
+  hero.className = 'home-hero';
+  section.insertBefore(hero, body);
+  hero.appendChild(h1);
 
   const strapline = document.createElement('p');
   strapline.className = 'strapline';
   strapline.textContent = 'Rehearse before you’re on.';
-  body.appendChild(strapline);
+  hero.appendChild(strapline);
 
   const packCard = document.createElement('div');
   packCard.className = 'pack-card';

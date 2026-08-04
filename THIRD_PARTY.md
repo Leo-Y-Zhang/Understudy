@@ -172,10 +172,51 @@ than assumed from the plan:
 | `public/models/whisper-tiny.en/onnx/encoder_model_quantized.onnx` | 10124993 | `e93ec822f16a8fd264e7de972ad17d615ea7334b75a52d54c50c2e18dd503a25` | `https://huggingface.co/onnx-community/whisper-tiny.en/resolve/main/onnx/encoder_model_quantized.onnx` |
 | `public/models/whisper-tiny.en/onnx/decoder_model_merged_quantized.onnx` | 30718858 | `c0592d0749413c960569e1c7fb806b060d5d18f3ebad4a95cbf9a77dc6e9be52` | `https://huggingface.co/onnx-community/whisper-tiny.en/resolve/main/onnx/decoder_model_merged_quantized.onnx` |
 
+## Fraunces (display serif, self-hosted UI font)
+
+- **Source**: Google Fonts' `fonts.googleapis.com/css2` API for the `Fraunces`
+  family (Google Fonts version `v38`), which serves static per-weight
+  instances cut from the upstream variable font
+  (`Fraunces[SOFT,WONK,opsz,wght].ttf`,
+  `github.com/undercasetype/Fraunces`) — not a runtime dependency, fetched
+  once while building this design pass and committed under `public/fonts/`.
+- **Designer**: Undercase Type, Phaedra Charles, Flavia Zimbardi.
+- **Licence**: SIL Open Font License, Version 1.1. Copyright 2020 The
+  Fraunces Project Authors (`github.com/undercasetype/Fraunces`). Full
+  licence text: `github.com/google/fonts/blob/main/ofl/fraunces/OFL.txt`.
+- **Cut used**: optical size pinned to `72` (Fraunces' larger, higher-contrast
+  display cut, not its text-optimised low-opsz cut) at font-weights `400`
+  and `600`, `latin` subset only (this app's UI copy is English-only) —
+  two static woff2 files, the "2 weights max" this design pass's brief
+  called for.
+- **Destination**: `public/fonts/`
+- **Why self-hosted**: same reason as every other asset in this file — zero
+  third-party network requests at runtime; `index.html` preloads both files
+  same-origin and `src/styles.css` declares them via local `@font-face`
+  rules with `font-display: swap`.
+
+| File | Bytes | SHA-256 | Source URL |
+|---|---|---|---|
+| `public/fonts/fraunces-400.woff2` | 18248 | `3e13c2d52e9dbe380e3279a89e425f1a90adf22965123b7581e9fff16ad27bb1` | `https://fonts.gstatic.com/s/fraunces/v38/6NUh8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0K7iN7hzFUPJH58nhr1K03gg7S2nfgRYIctxuTCf7T.woff2` |
+| `public/fonts/fraunces-600.woff2` | 18496 | `5a3ba02f0366b3d5d01ee80d17f2cac00f4b9751037561b27cee88acb2a46193` | `https://fonts.gstatic.com/s/fraunces/v38/6NUh8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0K7iN7hzFUPJH58nhr1K03gg7S2nfgRYIcaRyTCf7T.woff2` |
+
+Reproducing (no build script for this pair — the two `curl` calls used):
+
+```sh
+curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@72,400&display=swap"
+curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@72,600&display=swap"
+```
+
+then download the `latin`-subset `url(...)` each response's CSS points at (a
+modern desktop-Chrome user agent is required — without it, Google's API
+serves legacy woff/ttf instead of woff2).
+
 ## Totals
 
-- **Files vendored**: 18
-- **Total size**: 119,511,558 bytes (113.99 MiB)
+- **Files vendored**: 20
+- **Total size**: 119,548,302 bytes (114.02 MiB)
 - **Largest single file**: `public/models/whisper-tiny.en/onnx/decoder_model_merged_quantized.onnx` at 30,718,858 bytes (~29.3 MiB) — well under GitHub's 100 MB hard limit and the 95 MB cap `scripts/fetch-assets.mjs` enforces.
 
 ## Reproducing
