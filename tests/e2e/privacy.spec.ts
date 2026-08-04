@@ -93,4 +93,26 @@ test.describe('privacy', () => {
       expect(calledAt).toBeGreaterThanOrEqual(acceptedAt);
     }
   });
+
+  // Pins the consent screen's copy against the two claims a HIGH-severity
+  // review round found drifting from reality (src/ui/screens/consent.ts's
+  // "Your data, your control" section): replay auto-saves scores/flagged
+  // moments to IndexedDB the moment a session finishes, so "exists only in
+  // memory... disappears on reload" was false. This test has no opinion on
+  // the exact wording -- only that the copy keeps saying the true thing
+  // ("saved to this browser") and never regresses to the false one ("only
+  // in memory"), and that the substantive on-device guarantee ("The
+  // guarantee" section) isn't quietly softened while fixing the other claim.
+  test('consent copy accurately describes what is saved, and never claims analysis is memory-only', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    const consent = page.locator('[data-screen="consent"]');
+    await expect(consent).toBeVisible();
+
+    const text = (await consent.textContent()) ?? '';
+    expect(text).toMatch(/saved to this browser/i);
+    expect(text).not.toMatch(/only in memory/i);
+    expect(text).toMatch(/ever leaves this device/i);
+  });
 });

@@ -153,6 +153,34 @@ export async function createTranscriber(localModelPath: string): Promise<Transcr
 
   const pipelinePromise = pipeline('automatic-speech-recognition', 'whisper-tiny.en', {
     dtype: 'q8',
+    // `graphOptimizationLevel: 'disabled'` works around a real bug found
+    // while building the real-mode E2E gate (tests/e2e/real-session.spec.ts):
+    // onnxruntime-web's WASM backend fails to build a session from the
+    // vendored decoder_model_merged_quantized.onnx at its default
+    // optimization level ('all'), throwing
+    //   "Can't create a session. ERROR_CODE: 1, ERROR_MESSAGE:
+    //    qdq_actions.cc:137 TransposeDQWeightsForMatMulNBits Missing
+    //    required scale: model.decoder.embed_tokens.weight_merged_0_scale
+    //    for node: model.decoder.embed_tokens.weight_transposed_DequantizeLinear"
+    // -- a QDQ/MatMulNBits graph-transform pass choking on this exact
+    // graph. Reproduced against both the dev snapshot originally resolved
+    // by @huggingface/transformers@4.2.0's dependency range
+    // (onnxruntime-web@1.26.0-dev.20260416-b7804b056c) and the stable
+    // 1.26.0 release pinned via this repo's package.json `overrides` (so
+    // it isn't a dev-build-only regression) -- the bug is in whichever
+    // level-2/3 optimization pass performs this particular QDQ fusion, not
+    // the specific build. `onnxruntime-node` (the Node.js native binding
+    // tests/integration/whisper.test.ts runs against) does not hit this:
+    // its default optimization pipeline apparently doesn't apply the same
+    // problematic transform to this graph, which is exactly why this bug
+    // was invisible to the integration test and only surfaced once a real
+    // *browser* session made it far enough to attempt building the decoder
+    // session (previously masked entirely by MEDIUM-2's model-path 404,
+    // which failed before session creation was ever reached). Disabling
+    // graph optimization avoids the buggy pass; the model is small enough
+    // (whisper-tiny.en) that the loss of optimization is not a practical
+    // performance concern.
+    session_options: { graphOptimizationLevel: 'disabled' },
     progress_callback: (info) => {
       if (info.status === 'progress_total') {
         currentOnProgress?.(info.progress / 100);

@@ -71,26 +71,33 @@ export function consentScreen(app: App, props: ConsentProps): HTMLElement {
   body.appendChild(buildSection('The guarantee', () => {
     const p = document.createElement('p');
     p.textContent =
-      'Nothing you record here ever leaves this device. No uploads, no analytics, no accounts — ' +
-      'Understudy runs entirely inside this browser tab.';
+      'Nothing you record here — your video, your audio, or any analysis of them — ever leaves this ' +
+      'device. There’s no backend, no account, and no upload path for any of it. Understudy runs ' +
+      'entirely inside this browser tab.';
     return p;
   }));
 
   body.appendChild(buildSection('See for yourself', () => {
     const p = document.createElement('p');
     p.textContent =
-      'Don’t take that on trust. Open your browser’s developer tools, switch to the Network tab, ' +
-      'and rehearse a full session — you will see nothing but this page’s own files. No request ever ' +
-      'goes anywhere else.';
+      'Don’t take that on trust. Open your browser’s developer tools, switch to the Network tab, and ' +
+      'rehearse a full session. One third-party library, Google’s MediaPipe, tries to send anonymous ' +
+      'performance statistics as a session ends — this page’s Content-Security-Policy blocks that ' +
+      'request outright, and you’ll see the blocked attempt sitting right there in the Network tab. ' +
+      'That’s the exception that proves the rule: nothing you record, and nothing about your session, ' +
+      'is ever actually sent anywhere. Every other request you’ll see is this page’s own files.';
     return p;
   }));
 
   body.appendChild(buildSection('Your data, your control', () => {
     const p = document.createElement('p');
     p.textContent =
-      'Right now, nothing is saved between visits except your consent choice and which questions you’ve ' +
-      'already been asked — two small settings kept in this browser. Your recording and its analysis exist ' +
-      'only in memory while you use the app, and disappear the moment you close or reload the tab.';
+      'Two small settings are kept in this browser between visits regardless: your consent choice, and ' +
+      'which questions you’ve already been asked. On top of that, your scores and flagged moments are ' +
+      'saved to this browser automatically as soon as a session finishes, so you can track your progress ' +
+      'over time. Your video is different — it’s kept only if you tick “Keep video with this session” on ' +
+      'the replay screen afterwards; skip that and it’s discarded. “Wipe everything” on the dashboard ' +
+      'deletes all of it — scores, flagged moments, and any saved video — for good.';
     return p;
   }));
 

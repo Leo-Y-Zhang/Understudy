@@ -89,6 +89,50 @@ than assumed from the plan:
 | `public/mediapipe/wasm/vision_wasm_nosimd_internal.js` | 323180 | `e81d715a3d42cc3373602eb2f7aff795d164934db680e32496b65dab537f9658` |
 | `public/mediapipe/wasm/vision_wasm_nosimd_internal.wasm` | 10960242 | `a28483cd42e74e855bf5ebdb6b40d9b66a5b49e35e95020bc97669e6822a3192` |
 
+## onnxruntime-web (WASM inference runtime)
+
+- **Source package**: `onnxruntime-web@1.26.0` (npm, pinned via this repo's
+  `package.json` `overrides` — see the version note below), copied locally
+  from `node_modules/onnxruntime-web/dist/*` — no network fetch.
+- **Licence**: MIT (per the package's `package.json`).
+- **Destination**: `public/onnxruntime-web/`
+- **Why vendored**: `@huggingface/transformers` defaults
+  `env.backends.onnx.wasm.wasmPaths` to a `cdn.jsdelivr.net` URL whenever the
+  host application hasn't set it itself
+  (`node_modules/@huggingface/transformers/src/backends/onnx.js:337-357`) —
+  found while building `tests/e2e/real-session.spec.ts`: a real transcription
+  was silently fetching its inference engine from a public CDN, the one
+  third-party network request this app's whole privacy guarantee promises
+  never happens (see MEDIUM-1 in README.md's privacy section — module
+  workers don't inherit the page's CSP, so this wasn't blocked the way the
+  MediaPipe telemetry attempt is). `src/speech/whisper.worker.ts` points
+  `wasmPaths` at these vendored copies instead. Only the two variants it
+  actually selects between are vendored: the default (Chrome/Firefox/Edge)
+  SIMD+threaded+asyncify build, and Safari's SIMD+threaded build (no
+  thread-atomics "asyncify" support). `onnxruntime-web` ships several other
+  variants (jsep, jspi, non-simd, non-threaded, ...) this app never
+  requests.
+- **Version note**: `@huggingface/transformers@4.2.0`'s own dependency range
+  resolves to an `onnxruntime-web` *dev* prerelease
+  (`1.26.0-dev.20260416-b7804b056c`) by default. That dev build has an
+  unrelated bug of its own (a `qdq_actions.cc` "Missing required scale"
+  session-creation failure on this repo's vendored
+  `decoder_model_merged_quantized.onnx` graph, also found via
+  `tests/e2e/real-session.spec.ts`) — reproduced against both that dev build
+  and the stable `1.26.0` release, so it isn't a dev-build-only regression;
+  see `src/speech/asr.ts`'s `session_options: { graphOptimizationLevel:
+  'disabled' }`, which works around it. `1.26.0` (stable) is pinned via this
+  repo's `package.json` `overrides` regardless, since pinning a stable
+  release over an unpinned dev snapshot is the right default independent of
+  that bug.
+
+| File | Bytes | SHA-256 |
+|---|---|---|
+| `public/onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs` | 47389 | `8c66e9204e20b27147694b86d303764e085838218d6ecb45004b87f2b8b5d474` |
+| `public/onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm` | 23678474 | `66fe6d69b8835a9af0cde19533bafb09c71418bccf7c095d8c3c78f5800b01e8` |
+| `public/onnxruntime-web/ort-wasm-simd-threaded.mjs` | 24180 | `2de262ca1fe2d6e0ef9236bf77632fa01de232ce7b6a33071c37637ee53f4669` |
+| `public/onnxruntime-web/ort-wasm-simd-threaded.wasm` | 13022405 | `040d52ce5066707a10d45cb9500c35e70a9c2fb33c4fb63428da9ae45b956b97` |
+
 ## MediaPipe Face Landmarker model
 
 - **Source URL**: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`
@@ -130,8 +174,8 @@ than assumed from the plan:
 
 ## Totals
 
-- **Files vendored**: 14
-- **Total size**: 82,739,110 bytes (78.91 MiB)
+- **Files vendored**: 18
+- **Total size**: 119,511,558 bytes (113.99 MiB)
 - **Largest single file**: `public/models/whisper-tiny.en/onnx/decoder_model_merged_quantized.onnx` at 30,718,858 bytes (~29.3 MiB) — well under GitHub's 100 MB hard limit and the 95 MB cap `scripts/fetch-assets.mjs` enforces.
 
 ## Reproducing
@@ -140,9 +184,16 @@ than assumed from the plan:
 node scripts/fetch-assets.mjs
 ```
 
-The script copies the MediaPipe WASM runtime from the installed
-`@mediapipe/tasks-vision` package, downloads the two remaining URL-sourced
-assets, and prints the SHA-256 of every file it writes (the table above was
-generated from that output on 2026-08-04, model-repo commit
+The script copies the MediaPipe WASM runtime and the onnxruntime-web WASM
+runtime from the installed `@mediapipe/tasks-vision` and `onnxruntime-web`
+packages, downloads the two remaining URL-sourced assets, and prints the
+SHA-256 of every file it writes (the table above was generated from that
+output on 2026-08-04, model-repo commit
 `2575352d61be1bf7225cf8f8b268a4678025fc58` of `onnx-community/whisper-tiny.en`
-per the `X-Repo-Commit` response header at fetch time).
+per the `X-Repo-Commit` response header at fetch time). The two
+network-downloaded files (MediaPipe's `face_landmarker.task`, and every
+Whisper file under `public/models/`) are checked against pinned hashes after
+every download (`EXPECTED_SHA256` in the script) and the run fails if a
+downloaded file doesn't match what this document records — the two local
+copies (`@mediapipe/tasks-vision`, `onnxruntime-web`) have no such check, as
+there's no network fetch to verify against.
