@@ -1,6 +1,6 @@
 # Session Handoff — Understudy
 
-**State:** design spec + v1 implementation plan committed. No application code yet.
+**State:** measurement core in progress; capture math + vendored models landed.
 
 **Source of truth for execution:**
 `docs/superpowers/plans/2026-08-04-understudy-v1.md` — 17 tasks, executed in
@@ -14,7 +14,7 @@ with a verified test cycle and a pushed commit.
 - [x] T1 Scaffold, toolchain, CI
 - [x] T2 Core types + config
 - [x] T3 Vendor model assets
-- [ ] T4 Face math (pose Euler + iris gaze)
+- [x] T4 Face math (pose Euler + iris gaze)
 - [ ] T5 Gaze / eye-contact detector
 - [ ] T6 Blink + burst detector
 - [ ] T7 Expression-event detector
