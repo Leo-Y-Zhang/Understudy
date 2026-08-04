@@ -22,7 +22,7 @@ with a verified test cycle and a pushed commit.
 - [x] T9 VAD + pause detector
 - [x] T10 Fluency (WPM, pace, fillers)
 - [x] T11 Scoring + analyzeSession
-- [ ] T12 Capture layer + live HUD
+- [x] T12 Capture layer + live HUD
 - [ ] T13 Whisper worker + integration test
 - [ ] T14 Session flow UI (consent -> processing)
 - [ ] T15 Replay screen (timeline + scorecard)
