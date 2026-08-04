@@ -26,11 +26,17 @@ export function detectBlinks(frames: FaceSample[], cfg: UnderstudyConfig): Blink
 
     // Hysteresis: rising edge detection
     if (signal >= cfg.blinkOn && detectorState === 'open') {
+      // Any crossing >= blinkOn from the open state closes the detector,
+      // whether or not the onset ends up registering. This prevents a
+      // debounce-blocked candidate from resurfacing later as a "new" onset
+      // once the clock catches up on the same held-high signal -- a new
+      // onset requires the signal to drop below blinkOff and rise again.
+      detectorState = 'closed';
+
       // Check debounce: at least blinkMinGapS since last onset
       if (frame.t - lastOnsetTimeS >= cfg.blinkMinGapS) {
         blinkTimes.push(frame.t);
         lastOnsetTimeS = frame.t;
-        detectorState = 'closed';
       }
     } else if (signal < cfg.blinkOff) {
       // Falling edge: reset detector to open state
@@ -39,8 +45,9 @@ export function detectBlinks(frames: FaceSample[], cfg: UnderstudyConfig): Blink
   }
 
   // Step 2: Calculate blinks per minute
+  // (frames.length > 0 is guaranteed here by the early return above)
   const durationS = frames.length / 30;
-  const blinksPerMin = durationS > 0 ? (blinkTimes.length / durationS) * 60 : 0;
+  const blinksPerMin = (blinkTimes.length / durationS) * 60;
 
   // Step 3: Detect burst clusters (sliding window: >= burstCount onsets within burstWindowS)
   const events: DeliveryEvent[] = [];
@@ -65,7 +72,7 @@ export function detectBlinks(frames: FaceSample[], cfg: UnderstudyConfig): Blink
 
     // Merge overlapping burst windows
     if (bursts.length > 0) {
-      const merged = mergeOverlappingBursts(bursts);
+      const merged = mergeOverlappingBursts(bursts, blinkTimes, cfg.burstWindowS);
 
       // Create events from merged burst windows
       for (const burst of merged) {
@@ -98,10 +105,16 @@ export function detectBlinks(frames: FaceSample[], cfg: UnderstudyConfig): Blink
 /**
  * Merge overlapping burst windows.
  * A window is defined by [startIdx, endIdx] in the blinkTimes array.
- * Two windows overlap if they share any indices.
+ * Two windows are merged only if they chain in TIME: the next window's
+ * first onset must fall within burstWindowS of the current window's last
+ * onset. Array-index adjacency alone is not sufficient -- two unrelated
+ * clusters can be adjacent in the (filtered) bursts array while being far
+ * apart in time, and must not be fabricated into a single event.
  */
 function mergeOverlappingBursts(
-  bursts: Array<{ startIdx: number; endIdx: number }>
+  bursts: Array<{ startIdx: number; endIdx: number }>,
+  blinkTimes: number[],
+  burstWindowS: number
 ): Array<{ startIdx: number; endIdx: number }> {
   if (bursts.length === 0) return [];
 
@@ -109,18 +122,19 @@ function mergeOverlappingBursts(
   const sorted = [...bursts].sort((a, b) => a.startIdx - b.startIdx);
 
   const merged: Array<{ startIdx: number; endIdx: number }> = [];
-  let current = sorted[0]!;
+  let current = { startIdx: sorted[0]!.startIdx, endIdx: sorted[0]!.endIdx };
 
   for (let i = 1; i < sorted.length; i++) {
     const next = sorted[i]!;
-    // Check if current and next overlap or are adjacent
-    if (next.startIdx <= current.endIdx + 1) {
-      // Merge: extend current to include next
-      current.endIdx = Math.max(current.endIdx, next.endIdx);
+    const gapS = blinkTimes[next.startIdx]! - blinkTimes[current.endIdx]!;
+
+    if (gapS <= burstWindowS) {
+      // Chained in time: extend current to include next (new object, no mutation of inputs)
+      current = { startIdx: current.startIdx, endIdx: Math.max(current.endIdx, next.endIdx) };
     } else {
-      // No overlap: save current and start a new one
+      // Not chained in time: save current and start a new one
       merged.push(current);
-      current = next;
+      current = { startIdx: next.startIdx, endIdx: next.endIdx };
     }
   }
 

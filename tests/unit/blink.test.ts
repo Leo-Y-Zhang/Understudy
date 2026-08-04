@@ -99,4 +99,84 @@ describe('detectBlinks', () => {
     expect(result.blinksPerMin).toBe(0);
     expect(result.events).toEqual([]);
   });
+
+  // Test 6: Two independent 3-blink clusters ~100s apart must NOT be fabricated
+  // into one giant event. Regression for burst-merge using array-index adjacency
+  // instead of a time check (bursts.push({startIdx,endIdx}) merged whenever
+  // next.startIdx <= current.endIdx + 1, with no regard to the actual time gap
+  // between the clusters).
+  it('reports two separate burst events for two clusters ~100s apart, not one fabricated event', () => {
+    const frames = mkFrames([[102, true]]);
+    const framesWithBlinks = withBlinks(frames, [0.0, 0.4, 0.8, 100.0, 100.4, 100.8]);
+
+    const result = detectBlinks(framesWithBlinks, DEFAULT_CONFIG);
+
+    expect(result.blinkTimes.length).toBe(6);
+    expect(result.events.length).toBe(2);
+
+    const [first, second] = result.events;
+    expect(first!.severity).toBe(2);
+    expect(second!.severity).toBe(2);
+    expect(first!.t1).toBeLessThan(2);
+    expect(second!.t0).toBeGreaterThan(99);
+  });
+
+  // Test 7: True debounce suppression. A candidate onset that is blocked by the
+  // min-gap check must be gone for good -- it must NOT resurface later as a
+  // "new" onset once the clock catches up on the SAME held-high signal.
+  // The dip below blinkOff correctly reopens the detector (hysteresis), but the
+  // blocked re-crossing at F+3 must still close the detector so the continued
+  // high signal cannot trigger a second registration once blinkMinGapS elapses.
+  it('permanently suppresses a debounced re-crossing instead of firing it later', () => {
+    const cfg = { ...DEFAULT_CONFIG, blinkMinGapS: 0.15 };
+    const frames = mkFrames([[15, true]]);
+
+    // Onset at frame 300 (t=10.0s), held high for 2 frames.
+    frames[300]!.blend.eyeBlinkLeft = 0.9;
+    frames[300]!.blend.eyeBlinkRight = 0.9;
+    frames[301]!.blend.eyeBlinkLeft = 0.9;
+    frames[301]!.blend.eyeBlinkRight = 0.9;
+    // Dip below blinkOff (0.35) at frame 302 -- correctly reopens the detector.
+    frames[302]!.blend.eyeBlinkLeft = 0.2;
+    frames[302]!.blend.eyeBlinkRight = 0.2;
+    // Re-cross at frame 303 (t=10.1s, 0.1s gap < blinkMinGapS 0.15s) and stay
+    // high through frame 310 -- long enough that, under the buggy "state stays
+    // open on a blocked candidate" behavior, the gap would catch up (>=0.15s
+    // at frame 305, t=10.1667s) and fire a spurious second onset on this same
+    // held-high run with no new rising edge.
+    for (let i = 303; i <= 310; i++) {
+      frames[i]!.blend.eyeBlinkLeft = 0.9;
+      frames[i]!.blend.eyeBlinkRight = 0.9;
+    }
+
+    const result = detectBlinks(frames, cfg);
+
+    expect(result.blinkTimes.length).toBe(1);
+  });
+
+  // Test 7b: companion case -- a genuine new rising edge (signal drops back to
+  // baseline after the dip, then rises again once the gap is already
+  // satisfied) must register normally. Confirms the suppression fix does not
+  // over-suppress legitimate distinct onsets.
+  it('registers a genuine re-onset once the debounce gap is satisfied', () => {
+    const cfg = { ...DEFAULT_CONFIG, blinkMinGapS: 0.15 };
+    const frames = mkFrames([[15, true]]);
+
+    frames[300]!.blend.eyeBlinkLeft = 0.9;
+    frames[300]!.blend.eyeBlinkRight = 0.9;
+    frames[301]!.blend.eyeBlinkLeft = 0.9;
+    frames[301]!.blend.eyeBlinkRight = 0.9;
+    frames[302]!.blend.eyeBlinkLeft = 0.2;
+    frames[302]!.blend.eyeBlinkRight = 0.2;
+    // frames 303-305 stay at baseline (0) -- below blinkOff, detector stays open.
+    // Re-cross at frame 306 (t=10.2s, 0.2s gap >= blinkMinGapS 0.15s).
+    frames[306]!.blend.eyeBlinkLeft = 0.9;
+    frames[306]!.blend.eyeBlinkRight = 0.9;
+    frames[307]!.blend.eyeBlinkLeft = 0.9;
+    frames[307]!.blend.eyeBlinkRight = 0.9;
+
+    const result = detectBlinks(frames, cfg);
+
+    expect(result.blinkTimes.length).toBe(2);
+  });
 });
