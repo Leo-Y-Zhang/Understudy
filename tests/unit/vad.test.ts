@@ -130,6 +130,27 @@ describe('segmentSpeech', () => {
     const rms: RmsSeries = { hopS: HOP, values: new Float32Array(0) };
     expect(segmentSpeech(rms, cfg)).toEqual([]);
   });
+
+  it('a session with under 10% silence is still segmented, not read as all-silence', () => {
+    // 27.5s speech + 5s silence + 27.5s speech: an answer delivered without
+    // much dead air, which is the normal shape of a good take. Silence is
+    // 8.3% of the series, so the 10th-percentile noise-floor estimate lands
+    // ON the speech level (0.1) instead of the silence level, making the
+    // scaled threshold (0.3) higher than every sample in the session. The
+    // whole take then reads as one silent segment -- the detector reports
+    // nothing rather than reporting that it could not measure.
+    const rms = buildRms([
+      [27.5, 0.1],
+      [5, 0.001],
+      [27.5, 0.1],
+    ]);
+
+    const segs = segmentSpeech(rms, cfg);
+
+    expect(segs.some((s) => s.speech)).toBe(true);
+    expect(segs).toHaveLength(3);
+    expect(segs[1]!.speech).toBe(false);
+  });
 });
 
 describe('detectPauses', () => {
@@ -221,5 +242,26 @@ describe('detectPauses', () => {
 
   it('empty segments returns []', () => {
     expect(detectPauses([], cfg)).toEqual([]);
+  });
+
+  it('finds the one long pause in an otherwise continuous answer', () => {
+    // Same shape as segmentSpeech's under-10%-silence case: a single genuine
+    // 5s pause in the middle of a 60s answer. This is the pause the scorecard
+    // exists to surface, and it is exactly the one a percentile noise floor
+    // computed over a mostly-speech session throws away.
+    const rms = buildRms([
+      [27.5, 0.1],
+      [5, 0.001],
+      [27.5, 0.1],
+    ]);
+    const segs = segmentSpeech(rms, cfg);
+
+    const events = detectPauses(segs, cfg);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.type).toBe('pause');
+    expect(events[0]!.t0).toBeCloseTo(27.75, 9);
+    expect(events[0]!.t1).toBeCloseTo(32.5, 9);
+    expect(events[0]!.severity).toBe(3);
   });
 });

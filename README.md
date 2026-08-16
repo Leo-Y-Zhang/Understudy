@@ -63,7 +63,7 @@ flowchart LR
     fs --> core
     rms --> core
     words --> core
-    core["Pure measurement core\n(typed, deterministic,\n97 unit tests)"] --> ev["Delivery events\n+ scores"]
+    core["Pure measurement core\n(typed, deterministic,\n99 unit tests)"] --> ev["Delivery events\n+ scores"]
     ev --> replay["Annotated replay\n+ scorecard + trends"]
 ```
 
@@ -103,7 +103,7 @@ question") — it cannot tell those apart from the filler.
 ```bash
 npm ci
 npm run dev          # local dev server
-npm run test:unit    # 97 unit tests
+npm run test:unit    # 99 unit tests
 npm run test:e2e     # Playwright journeys incl. the zero-network guarantee + axe a11y scan
 npm run test:integration  # real Whisper transcription of a synthetic-voice fixture (local only)
 npm run build        # production build (deployed to GitHub Pages by CI)

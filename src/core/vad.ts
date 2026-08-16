@@ -10,7 +10,31 @@ export function segmentSpeech(rms: RmsSeries, cfg: UnderstudyConfig): VadSegment
   }
 
   const noiseFloor = quantile(values, cfg.vadNoisePercentile);
-  const threshold = Math.max(noiseFloor * cfg.vadFactor, cfg.vadAbsMin);
+  let threshold = Math.max(noiseFloor * cfg.vadFactor, cfg.vadAbsMin);
+
+  // The percentile noise floor assumes at least vadNoisePercentile of the
+  // session is silence. An answer delivered with little dead air breaks that
+  // assumption: the 10th percentile lands on the SPEECH level, the scaled
+  // threshold ends up above every sample in the series, and the whole take
+  // reads as one long silence -- so the pause detector reports nothing, and
+  // fluency scores a clean sheet, precisely for the sessions that contain
+  // the least silence to estimate from. A single genuine 5s pause in an
+  // otherwise continuous 60s answer is under 10% of the series and was
+  // dropped this way.
+  //
+  // When no sample at all clears the estimated threshold, the estimate is
+  // the thing that failed, not the audio. Fall back to vadAbsMin, the
+  // config's own statement of "this much energy is speech", but only if
+  // something in the series actually reaches it -- a genuinely silent or
+  // too-quiet session (mic muted, speech below vadAbsMin) has no speech in
+  // it and must keep reading as silence rather than being talked into one.
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    if (values[i]! > peak) peak = values[i]!;
+  }
+  if (peak < threshold && peak >= cfg.vadAbsMin) {
+    threshold = cfg.vadAbsMin;
+  }
 
   // Per-frame state with hangover: silence -> speech flips immediately on a
   // raw-speech frame; speech -> silence only after vadHangoverS seconds
