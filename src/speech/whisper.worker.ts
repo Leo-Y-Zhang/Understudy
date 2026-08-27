@@ -106,13 +106,58 @@ function configureOnnxWasmPaths(siteBasePath: string): void {
     : { mjs: `${dir}ort-wasm-simd-threaded.asyncify.mjs`, wasm: `${dir}ort-wasm-simd-threaded.asyncify.wasm` };
 }
 
+// `modelBasePath` and `siteBasePath` arrive over postMessage and both end up
+// deciding where this worker fetches from -- the first as
+// `env.localModelPath`, the second as the `wasmPaths` prefix. README.md's
+// privacy section is explicit that the page's `connect-src 'self'` does not
+// reach inside a module worker, so a base path pointing off-origin here is
+// precisely the "no third-party network request, ever" guarantee broken with
+// nothing left to catch it. Whatever posted the message, only a same-origin
+// absolute path is accepted.
+//
+// Comparing against a re-resolved URL rather than pattern-matching the
+// string: `new URL()` normalises `..` segments, backslashes and
+// protocol-relative `//host/` forms (all of which leave the origin or the
+// intended directory while still "starting with a slash"), so requiring the
+// resolved origin to be this worker's own *and* the resolved pathname to be
+// byte-identical to what was sent rejects those without this file having to
+// enumerate them.
+function isSameOriginBasePath(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.startsWith('/') || !value.endsWith('/')) return false;
+  let resolved: URL;
+  try {
+    resolved = new URL(value, self.location.href);
+  } catch {
+    return false;
+  }
+  return resolved.origin === self.location.origin && resolved.pathname === value;
+}
+
 // Memoized on the first 'transcribe' message's modelBasePath and reused for
 // every job after that (every caller in this app sends the same value, so
 // there is no cache-invalidation concern here).
 let transcriberPromise: Promise<Transcriber> | null = null;
 
 self.onmessage = (ev: MessageEvent<InMessage>): void => {
+  // A dedicated worker is only reachable from the document that constructed
+  // it -- there is no cross-origin postMessage path into one the way there is
+  // into a window -- and messages delivered through a worker's implicit port
+  // carry an empty `origin`, since HTML's message-port post-message steps
+  // never set one. Accepting this context's own origin as well as the empty
+  // string is deliberate: the empty string is what engines actually report,
+  // but a guard on the privacy path should reject only values that genuinely
+  // came from somewhere else, not silently kill transcription if some engine
+  // reports the owner's origin instead.
+  if (ev.origin !== '' && ev.origin !== self.location.origin) return;
   if (ev.data?.type !== 'transcribe') return;
+
+  // Reported back rather than dropped: whisperClient.ts's promise only
+  // settles on a 'result' or an 'error' message, so a silently ignored
+  // transcribe message would leave the caller waiting forever.
+  if (!isSameOriginBasePath(ev.data.modelBasePath) || !isSameOriginBasePath(ev.data.siteBasePath)) {
+    post({ type: 'error', message: 'whisper worker: base paths must be same-origin absolute paths' });
+    return;
+  }
 
   void (async () => {
     try {
