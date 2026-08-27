@@ -105,13 +105,16 @@ const WHISPER_DEST_DIR = path.join(PUBLIC_DIR, 'models', WHISPER_MODEL_ID);
 // node_modules, not a network fetch, so there's no upstream to have
 // changed under us). Values are exactly THIRD_PARTY.md's table -- the last
 // known-good hash for each vendored file, reviewed and documented there.
-// Checked in downloadFile() after every download: a mismatch means the
-// upstream file changed (a re-release, a takedown-and-replace, or a
-// compromised host/MITM) since this repo last reviewed it, and the run
-// fails loudly instead of silently vendoring different bytes than what
-// THIRD_PARTY.md claims ships. Bumping a pin here is a deliberate, reviewed
-// action (re-run fetch-assets.mjs, diff the new hash against this map,
-// update both together), not something that should ever happen silently.
+// Checked in downloadFile() against the response body *before* a single
+// byte reaches the disk: a mismatch means the upstream file changed (a
+// re-release, a takedown-and-replace, or a compromised host/MITM) since
+// this repo last reviewed it, and the run fails loudly instead of silently
+// vendoring different bytes than what THIRD_PARTY.md claims ships. Bumping
+// a pin here is a deliberate, reviewed action (re-run fetch-assets.mjs,
+// diff the new hash against this map, update both together), not something
+// that should ever happen silently. Every network-fetched file must appear
+// here -- downloadFile() refuses to write an unpinned one at all, so there
+// is no path by which unreviewed remote bytes land in public/.
 const EXPECTED_SHA256 = {
   'public/mediapipe/face_landmarker.task':
     '64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff',
@@ -138,6 +141,16 @@ function sha256File(buf) {
   return createHash('sha256').update(buf).digest('hex');
 }
 
+function assertExpectedSha256(relPath, sha256, expectedSha256) {
+  if (sha256 === expectedSha256) return;
+  throw new Error(
+    `${relPath}: SHA-256 mismatch -- expected ${expectedSha256}, got ${sha256}. ` +
+      `The upstream file no longer matches THIRD_PARTY.md's pinned hash; refusing to vendor it unreviewed. ` +
+      `If this is an intentional upstream update, review the new file, then update EXPECTED_SHA256 in this ` +
+      `script and THIRD_PARTY.md together.`,
+  );
+}
+
 async function recordFile(destPath, source, expectedSha256) {
   const buf = await (await import('node:fs/promises')).readFile(destPath);
   const bytes = buf.length;
@@ -147,13 +160,8 @@ async function recordFile(destPath, source, expectedSha256) {
     );
   }
   const sha256 = sha256File(buf);
-  if (expectedSha256 && sha256 !== expectedSha256) {
-    throw new Error(
-      `${path.relative(REPO_ROOT, destPath)}: SHA-256 mismatch -- expected ${expectedSha256}, got ${sha256}. ` +
-        `The upstream file no longer matches THIRD_PARTY.md's pinned hash; refusing to vendor it unreviewed. ` +
-        `If this is an intentional upstream update, review the new file, then update EXPECTED_SHA256 in this ` +
-        `script and THIRD_PARTY.md together.`,
-    );
+  if (expectedSha256) {
+    assertExpectedSha256(path.relative(REPO_ROOT, destPath), sha256, expectedSha256);
   }
   manifest.push({ file: path.relative(REPO_ROOT, destPath).split(path.sep).join('/'), bytes, sha256, source });
   console.log(`  ${path.relative(REPO_ROOT, destPath).padEnd(60)} ${String(bytes).padStart(10)} bytes  sha256:${sha256}`);
@@ -210,18 +218,34 @@ async function copyOnnxRuntimeWasm() {
   }
 }
 
+// Downloads over the network land in a Buffer first and are hash-checked
+// there, and only a file whose bytes match its reviewed pin is ever written
+// to disk. This used to write first and hash afterwards, which meant a
+// re-released, taken-down-and-replaced or MITM'd upstream file was already
+// sitting in `public/` -- staged, committable, and servable by `vite dev` --
+// by the time the run failed on it, and clearing it up was left to whoever
+// noticed. Nothing this script fetches remotely is trusted enough to write
+// unverified, so the check now gates the write instead of trailing it.
 async function downloadFile(url, destPath, source) {
-  await mkdir(path.dirname(destPath), { recursive: true });
+  const relPath = path.relative(REPO_ROOT, destPath).split(path.sep).join('/');
+  const expectedSha256 = EXPECTED_SHA256[relPath];
+  if (!expectedSha256) {
+    throw new Error(
+      `${relPath} has no pinned SHA-256 in EXPECTED_SHA256, so its downloaded bytes cannot be verified. ` +
+        `Review the upstream file, then add its hash to EXPECTED_SHA256 in this script and to THIRD_PARTY.md ` +
+        `together before vendoring it.`,
+    );
+  }
   console.log(`  fetching ${url}`);
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`GET ${url} -> HTTP ${res.status} ${res.statusText}`);
   }
-  const arrayBuf = await res.arrayBuffer();
-  const buf = Buffer.from(arrayBuf);
+  const buf = Buffer.from(await res.arrayBuffer());
+  assertExpectedSha256(relPath, sha256File(buf), expectedSha256);
+  await mkdir(path.dirname(destPath), { recursive: true });
   await writeFile(destPath, buf);
-  const relPath = path.relative(REPO_ROOT, destPath).split(path.sep).join('/');
-  await recordFile(destPath, source ?? url, EXPECTED_SHA256[relPath]);
+  await recordFile(destPath, source ?? url, expectedSha256);
 }
 
 async function fetchFaceLandmarker() {

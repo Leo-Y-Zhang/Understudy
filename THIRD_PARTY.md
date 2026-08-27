@@ -233,8 +233,11 @@ output on 2026-08-04, model-repo commit
 `2575352d61be1bf7225cf8f8b268a4678025fc58` of `onnx-community/whisper-tiny.en`
 per the `X-Repo-Commit` response header at fetch time). The two
 network-downloaded files (MediaPipe's `face_landmarker.task`, and every
-Whisper file under `public/models/`) are checked against pinned hashes after
-every download (`EXPECTED_SHA256` in the script) and the run fails if a
-downloaded file doesn't match what this document records — the two local
-copies (`@mediapipe/tasks-vision`, `onnxruntime-web`) have no such check, as
-there's no network fetch to verify against.
+Whisper file under `public/models/`) are checked against pinned hashes
+(`EXPECTED_SHA256` in the script) while still in memory, *before* anything is
+written to disk, and the run fails if a downloaded file doesn't match what
+this document records — so bytes that don't match never reach `public/` at
+all, and a file with no pin recorded here is refused outright rather than
+vendored unverified. The two local copies (`@mediapipe/tasks-vision`,
+`onnxruntime-web`) have no such check, as there's no network fetch to verify
+against.
