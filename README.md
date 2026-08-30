@@ -117,5 +117,7 @@ and hashes — see [THIRD_PARTY.md](THIRD_PARTY.md).
 
 ## Licence
 
-[MIT](LICENSE). Model weights and runtime licences are listed in
+Proprietary source-available — see [LICENSE](LICENSE). You may read it, run it, and publish what you find, including a refutation. No reuse, modification, redistribution, or use as machine-learning training data.
+
+Model weights and runtime licences are listed in
 [THIRD_PARTY.md](THIRD_PARTY.md).
