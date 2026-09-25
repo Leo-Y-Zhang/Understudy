@@ -10,6 +10,15 @@ body {
   padding: 0;
 }
 
+/* Every screen shows and hides its parts with the `hidden` attribute, but
+   that is only the browser stylesheet's `display: none`, which any author
+   `display` rule beats: .rec-indicator and .progress-wrap are flex rows, so
+   "Recording" stayed on screen before recording began and beside a camera
+   error, and the progress bar stayed up next to a failed transcription. */
+[hidden] {
+  display: none !important;
+}
+
 /* ==========================================================================
    Fraunces (display serif) -- self-hosted, two static weights cut at the
    72pt optical size (Fraunces' larger, higher-contrast display letterforms,
