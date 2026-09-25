@@ -85,7 +85,8 @@ export function consentScreen(app: App, props: ConsentProps): HTMLElement {
     p.textContent =
       'Don’t take that on trust. Open your browser’s developer tools, switch to the Network tab, and ' +
       'rehearse a full session. One third-party library, Google’s MediaPipe, tries to send anonymous ' +
-      'performance statistics as a session ends — this page’s Content-Security-Policy blocks that ' +
+      'performance statistics once per session, about a minute after the camera starts (or when you ' +
+      'stop, if that comes first) — this page’s Content-Security-Policy blocks that ' +
       'request outright, and you’ll see the blocked attempt sitting right there in the Network tab. ' +
       'That’s the exception that proves the rule: nothing you record, and nothing about your session, ' +
       'is ever actually sent anywhere. Every other request you’ll see is this page’s own files.';
