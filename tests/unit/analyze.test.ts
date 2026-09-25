@@ -96,6 +96,10 @@ describe('analyzeSession', () => {
     expect(result.stats.eyeContactPct).toBeGreaterThan(96);
     expect(result.stats.eyeContactPct).toBeLessThan(97);
 
+    // The detected blink burst reaches scoring: 4 blinks in ~60s is 4/min,
+    // halfway up to the 8/min ideal band (50), less 5 for the one burst.
+    expect(result.sub.blinkSteadiness).toBeCloseTo(45, 0);
+
     expect(result.composure).toBeGreaterThan(0);
     expect(result.composure).toBeLessThan(100);
 
