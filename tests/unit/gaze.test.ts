@@ -55,13 +55,15 @@ describe('gaze detector', () => {
         return detectGaze(frames, cfg);
       };
 
-      const outside = withTwoSeconds(-(limit + 0.05));
-      expect(outside.events).toHaveLength(1);
-      expect(outside.eyeContactPct).toBeCloseTo(80, 0);
+      for (const sign of [1, -1]) {
+        const outside = withTwoSeconds(sign * (limit + 0.05));
+        expect(outside.events).toHaveLength(1);
+        expect(outside.eyeContactPct).toBeCloseTo(80, 0);
 
-      const inside = withTwoSeconds(limit - 0.05);
-      expect(inside.events).toHaveLength(0);
-      expect(inside.eyeContactPct).toBeCloseTo(100, 0);
+        const inside = withTwoSeconds(sign * (limit - 0.05));
+        expect(inside.events).toHaveLength(0);
+        expect(inside.eyeContactPct).toBeCloseTo(100, 0);
+      }
     });
   }
 
