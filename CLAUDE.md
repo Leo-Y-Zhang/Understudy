@@ -17,8 +17,9 @@ file (MediaPipe, Whisper, onnxruntime-web) is vendored under `public/`.
   data, question packs, UI screens.
 - `public/models/`, `public/mediapipe/`, `public/onnxruntime-web/` — vendored
   model/runtime assets (large; inflate a naive LOC count).
-- `tests/unit/` (14 files), `tests/integration/` (real, non-mocked Whisper
-  transcription, offline), `tests/e2e/` (Playwright: journey, privacy, a11y).
+- `tests/unit/` (15 files), `tests/integration/` (real, non-mocked Whisper
+  transcription, offline), `tests/e2e/` (Playwright: journey, privacy,
+  failure paths, a11y).
 - `scripts/`, `docs/`.
 
 ## Install
@@ -39,7 +40,7 @@ npm run typecheck   # tsc --noEmit
 ## Test
 
 ```
-npm run test:unit          # vitest run --dir tests/unit  (14 files, ~111 tests, ~2s)
+npm run test:unit          # vitest run --dir tests/unit  (15 files, ~125 tests, ~2s)
 npm run test:integration   # vitest run --dir tests/integration (real Whisper, offline, ~9s)
 npm run test:e2e           # playwright test — see caveat below
 ```
@@ -52,9 +53,10 @@ npx vitest run tests/unit/scoring.test.ts
 
 CI's `build` job (typecheck, lint, `test:unit`, build) plus `test:integration`
 is what this repo can prove offline and is the practical gate for a web
-session. `test:e2e` (9 Playwright tests: journey, privacy/zero-network, a11y)
-is the repo's real end-to-end gate and is what CI's separate `e2e` job runs —
-but see the environment caveat below before attempting it here.
+session. `test:e2e` (11 Playwright tests: journey, privacy/zero-network,
+failure paths, a11y) is the repo's real end-to-end gate and is what CI's
+separate `e2e` job runs — but see the environment caveat below before
+attempting it here.
 
 ## Environment caveats (from audit)
 

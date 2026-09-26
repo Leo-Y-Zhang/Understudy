@@ -84,8 +84,10 @@ test.describe('privacy', () => {
     await expect(page.locator('[data-screen="session"]')).toBeVisible();
 
     // Session mounts and immediately starts real capture (Camera.start() ->
-    // getUserMedia); the fake-device flags let this succeed headless.
-    await expect(page.locator('.rec-indicator')).toBeVisible({ timeout: 20_000 });
+    // getUserMedia); the fake-device flags let this succeed headless. The REC
+    // indicator only shows once all of capture is up, including MediaPipe's
+    // model load, which can take a while on a busy runner.
+    await expect(page.locator('.rec-indicator')).toBeVisible({ timeout: 60_000 });
 
     const gumCalls = await page.evaluate(() => window.__gumCalls);
     expect(gumCalls.length).toBeGreaterThan(0);
