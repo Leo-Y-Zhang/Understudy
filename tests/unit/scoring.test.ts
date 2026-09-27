@@ -139,4 +139,70 @@ describe('scoreSession', () => {
     expect(at(60)).toBe(0);
     expect(at(220)).toBe(0);
   });
+
+  it('exact-value spot checks: pace score between the bands, and the variability penalty', () => {
+    const at = (wpm: number, paceCv = 0) => scoreSession({ ...PERFECT, wpm, paceCv }, cfg).sub.pace;
+
+    expect(at(85)).toBeCloseTo(50, 9); // halfway from 60 up to the 110 ideal
+    expect(at(190)).toBeCloseTo(50, 9); // halfway from the 160 ideal to 220
+    expect(at(135, 0.4)).toBe(100); // variability at the threshold costs nothing
+    expect(at(135, 0.9)).toBeCloseTo(90, 9); // 20 points per unit of CV above 0.4
+  });
+
+  it('exact-value spot checks: blinkSteadiness score map and burst penalty', () => {
+    const at = (blinksPerMin: number, burstCount = 0) =>
+      scoreSession({ ...PERFECT, blinksPerMin, burstCount }, cfg).sub.blinkSteadiness;
+
+    expect(at(8)).toBe(100);
+    expect(at(26)).toBe(100);
+    expect(at(4)).toBeCloseTo(50, 9); // halfway from 0 up to the ideal band
+    expect(at(43)).toBeCloseTo(50, 9); // halfway from the ideal band to 60
+    expect(at(0)).toBe(0);
+    expect(at(60)).toBe(0);
+    expect(at(15, 2)).toBe(90); // 5 points per blink burst
+  });
+
+  it('exact-value spot checks: fluency allows one filler a minute, then charges per filler and per pause', () => {
+    const at = (fillers: number, pauses: Array<1 | 2 | 3> = []) =>
+      scoreSession(
+        {
+          ...PERFECT,
+          durationS: 60,
+          fillerEvents: Array.from({ length: fillers }, () => mkEvent('filler', 1)),
+          pauseEvents: pauses.map((severity) => mkEvent('pause', severity)),
+        },
+        cfg
+      ).sub.fluency;
+
+    expect(at(1)).toBe(100);
+    expect(at(3)).toBe(76); // 12 points per filler per minute above the first
+    expect(at(0, [1])).toBe(96);
+    expect(at(0, [2])).toBe(92);
+    expect(at(0, [3])).toBe(86);
+  });
+
+  it('exact-value spot checks: expressionControl charges by event severity', () => {
+    const at = (severity: 1 | 2 | 3) =>
+      scoreSession({ ...PERFECT, expressionEvents: [mkEvent('expression', severity)] }, cfg).sub.expressionControl;
+
+    expect(at(1)).toBe(92);
+    expect(at(2)).toBe(88);
+    expect(at(3)).toBe(82);
+  });
+
+  it('composure weights each sub-score as configured (.22 .22 .16 .14 .13 .13)', () => {
+    // PERFECT scores 100 on every sub-score, so zeroing exactly one of them
+    // costs composure exactly that sub-score's weight x 100.
+    const composure = (parts: Partial<ScoreParts>) => scoreSession({ ...PERFECT, ...parts }, cfg).composure;
+    const many = (type: DeliveryEvent['type'], severity: 1 | 2 | 3) =>
+      Array.from({ length: 30 }, () => mkEvent(type, severity));
+
+    expect(composure({})).toBeCloseTo(100, 9);
+    expect(composure({ eyeContactPct: 40 })).toBeCloseTo(78, 9);
+    expect(composure({ durationS: 60, fillerEvents: many('filler', 1) })).toBeCloseTo(78, 9);
+    expect(composure({ wpm: 60 })).toBeCloseTo(84, 9);
+    expect(composure({ expressionEvents: many('expression', 3) })).toBeCloseTo(86, 9);
+    expect(composure({ blinksPerMin: 60 })).toBeCloseTo(87, 9);
+    expect(composure({ fidgetIndex: 0.35 })).toBeCloseTo(87, 9);
+  });
 });

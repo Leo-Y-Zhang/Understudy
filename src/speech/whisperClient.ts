@@ -1,7 +1,8 @@
 // Main-thread client for the Whisper transcription worker (whisper.worker.ts).
 // Spawns the worker lazily on the first transcribe() call and reuses it for
 // every call after that, since the vendored model only needs to load once
-// per worker lifetime. Only one job runs at a time: the worker's message
+// per worker lifetime -- until a job fails, which retires the worker (see
+// transcribe()). Only one job runs at a time: the worker's message
 // protocol has no per-job id to disambiguate concurrent replies, so a
 // second call while one is in flight is rejected rather than silently
 // queued or left to race the first call's listeners.
@@ -105,6 +106,24 @@ export async function transcribe(
 
   try {
     const w = getWorker();
+    // Any failure retires this worker: terminate it and drop the cached
+    // singleton so the *next* transcribe() call (e.g. a "Try again" retry)
+    // spawns a fresh one instead of reusing one that can only fail again.
+    //  - Final-review Fix 1: a worker-level ErrorEvent means something went
+    //    wrong outside the worker's own control flow, so its state
+    //    afterwards is not trustworthy.
+    //  - An in-band { type: 'error' } is no safer to reuse. After a failed
+    //    model load the worker keeps its rejected pipeline promise (asr.ts
+    //    and whisper.worker.ts both memoize it), and onnxruntime-web latches
+    //    a failed WASM start-up for the life of the realm ("previous call to
+    //    'initializeWebAssembly()' failed."), so every retry on that worker
+    //    failed the same way and only a reload -- which loses the recording
+    //    processing.ts keeps in memory for exactly this retry -- got past it.
+    // The cost is loading the model again after a failure.
+    const retire = (): void => {
+      w.terminate();
+      if (worker === w) worker = null;
+    };
     return await new Promise<TimedWord[]>((resolve, reject) => {
       const cleanup = (): void => {
         w.removeEventListener('message', onMessage);
@@ -119,20 +138,13 @@ export async function transcribe(
           resolve(msg.words);
         } else if (msg.type === 'error') {
           cleanup();
+          retire();
           reject(new Error(msg.message));
         }
       };
       const onWorkerError = (ev: ErrorEvent): void => {
         cleanup();
-        // Final-review Fix 1: a worker-level error (as opposed to an
-        // in-band { type: 'error' } message the worker's own try/catch
-        // reported) means something went wrong outside the worker's
-        // control-flow -- its state afterwards is not trustworthy. Kill it
-        // and drop the cached singleton so the *next* transcribe() call
-        // (e.g. a "Try again" retry) spawns a fresh worker instead of
-        // reusing one that may be half-initialized or wedged.
-        w.terminate();
-        if (worker === w) worker = null;
+        retire();
         reject(new Error(ev.message || 'whisper worker error'));
       };
 

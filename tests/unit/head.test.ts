@@ -34,6 +34,25 @@ describe('headSteadiness', () => {
     expect(result.events.length).toBe(0);
   });
 
+  // Every rotation axis counts, combined as one angular speed: the other
+  // tests only ever move yaw.
+  it('includes pitch and roll in the angular speed, combined as a Euclidean norm', () => {
+    const drift = (rates: { yaw?: number; pitch?: number; roll?: number }) =>
+      headSteadiness(
+        mkFrames([[10, true]]).map((f) => ({
+          ...f,
+          yaw: (rates.yaw ?? 0) * f.t,
+          pitch: (rates.pitch ?? 0) * f.t,
+          roll: (rates.roll ?? 0) * f.t,
+        })),
+        DEFAULT_CONFIG
+      ).fidgetIndex;
+
+    expect(drift({ pitch: 0.02 })).toBeCloseTo(0.02, 6);
+    expect(drift({ roll: 0.02 })).toBeCloseTo(0.02, 6);
+    expect(drift({ yaw: 0.03, pitch: 0.04 })).toBeCloseTo(0.05, 6);
+  });
+
   // Test 3 (authoritative spec): Still 4s + shake 2s (yaw alternates 0.05/0 each
   // frame -> per-frame delta 0.05 rad -> speed 1.5 rad/s) + still 4s.
   // Expected: exactly one event, TRIMMED to the actual shaking samples (t0~4, t1~6),

@@ -22,11 +22,12 @@ FaceLandmarker) and speech recognition (Whisper tiny.en) run **on-device, in
 the browser** — every model file is served from this site itself.
 
 One third-party library, Google's MediaPipe, does attempt to send anonymous
-performance statistics as a session ends. This page's Content-Security-Policy
-pins `connect-src 'self'`, which blocks that request outright — open devtools
-→ Network tab during a session and you'll see the attempt sit there marked
-blocked. That's the only outbound request this app ever tries, and it never
-succeeds; nothing you record is ever sent anywhere.
+performance statistics, once per session: about a minute after the camera
+starts, or as the session ends if that comes first. This page's
+Content-Security-Policy pins `connect-src 'self'`, which blocks that request
+outright — open devtools → Network tab during a session and you'll see the
+attempt sit there marked blocked. That's the only outbound request this app
+ever tries, and it never succeeds; nothing you record is ever sent anywhere.
 
 The CSP pins the *document's* connections to same-origin, but module workers
 don't inherit a page's `<meta>` CSP — the speech worker (where transcription
@@ -63,7 +64,7 @@ flowchart LR
     fs --> core
     rms --> core
     words --> core
-    core["Pure measurement core\n(typed, deterministic,\n99 unit tests)"] --> ev["Delivery events\n+ scores"]
+    core["Pure measurement core\n(typed, deterministic,\nunit-tested)"] --> ev["Delivery events\n+ scores"]
     ev --> replay["Annotated replay\n+ scorecard + trends"]
 ```
 
@@ -103,7 +104,7 @@ question") — it cannot tell those apart from the filler.
 ```bash
 npm ci
 npm run dev          # local dev server
-npm run test:unit    # 99 unit tests
+npm run test:unit    # unit tests (Vitest)
 npm run test:e2e     # Playwright journeys incl. the zero-network guarantee + axe a11y scan
 npm run test:integration  # real Whisper transcription of a synthetic-voice fixture (local only)
 npm run build        # production build (deployed to GitHub Pages by CI)

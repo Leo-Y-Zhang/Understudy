@@ -121,4 +121,18 @@ describe('detectExpressionEvents', () => {
     expect(e.t0).toBeCloseTo(4, 1);
     expect(e.t1 - e.t0).toBeCloseTo(0.3, 1);
   });
+
+  // The same spike on both sides is an ordinary smile: the channel measures
+  // the left/right difference, not how much someone smiles.
+  it('does not flag a symmetric smile as an asymmetric-smile event', () => {
+    const frames: FaceSample[] = mkFrames([[8, true]]).map((f) => {
+      const v = stepProfile(f.t, 0.05, [[4, 4.3, 0.6]]);
+      return {
+        ...f,
+        blend: { ...f.blend, mouthSmileLeft: v, mouthSmileRight: v },
+      };
+    });
+
+    expect(detectExpressionEvents(frames, cfg)).toEqual([]);
+  });
 });

@@ -101,7 +101,7 @@ test.describe('real (non-mock) session', () => {
 
     // Real capture: camera + FaceTracker (MediaPipe) + AudioMeter + Recorder
     // all spin up here (see src/ui/screens/session.ts's start()).
-    await expect(page.locator('.rec-indicator')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('.rec-indicator')).toBeVisible({ timeout: 60_000 });
 
     // D10 regression: browser Back or a reload mid-recording used to
     // silently discard the take with no warning at all (session.ts had no
@@ -109,12 +109,12 @@ test.describe('real (non-mock) session', () => {
     // 'beforeunload' event and reading window.dispatchEvent()'s own return
     // value (false iff some listener called preventDefault()) proves the
     // guard is actually installed, without triggering a real navigation or
-    // needing to handle a native dialog. Polled rather than checked once:
-    // the guard is installed in the same synchronous turn that flips
-    // .rec-indicator visible, but MediaPipe's own WASM/graph startup
-    // logging around that exact moment can leave a very short externally-
-    // observable gap between "indicator visible" and "listener attached"
-    // becoming visible to the CDP session driving this test.
+    // needing to handle a native dialog. The guard is installed in the same
+    // synchronous turn that un-hides .rec-indicator; the poll is only a
+    // margin. (The gap it was first added for was the indicator itself:
+    // its `display: flex` overrode `hidden` until styles.css gained a
+    // `[hidden]` rule, so it showed from mount, seconds before recording
+    // and this guard existed -- see failure-paths.spec.ts.)
     await expect
       .poll(() => page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true }))), {
         message: 'waiting for the beforeunload guard to be installed while recording',
